@@ -1,1 +1,12 @@
 .aider*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+
+# Chezmerge
+.merge_workspace/
