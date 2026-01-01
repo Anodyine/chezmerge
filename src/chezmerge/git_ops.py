@@ -38,3 +38,11 @@ class GitHandler:
             return self.run_git(["show", f"{revision}:{path}"])
         except subprocess.CalledProcessError:
             return ""
+
+    def get_changed_files(self, base_rev: str, target_rev: str) -> list[str]:
+        """Returns a list of filenames changed between two revisions."""
+        try:
+            output = self.run_git(["diff", "--name-only", base_rev, target_rev])
+            return [line.strip() for line in output.splitlines() if line.strip()]
+        except subprocess.CalledProcessError:
+            return []
