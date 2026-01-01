@@ -1,5 +1,18 @@
-from .ui import ChezmergeApp
-from .logic import MergeItem, FileState, MergeScenario
+import sys
+from pathlib import Path
+
+# Logic to handle running this file directly vs as a module
+if __name__ == "__main__" and __package__ is None:
+    # Add 'src' to sys.path to allow importing 'chezmerge' as a package
+    src_path = Path(__file__).resolve().parent.parent
+    if str(src_path) not in sys.path:
+        sys.path.insert(0, str(src_path))
+    
+    from chezmerge.ui import ChezmergeApp
+    from chezmerge.logic import MergeItem, FileState, MergeScenario
+else:
+    from .ui import ChezmergeApp
+    from .logic import MergeItem, FileState, MergeScenario
 
 def create_dummy_data():
     """Generates a scenario for UI testing."""
