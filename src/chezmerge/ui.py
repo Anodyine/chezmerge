@@ -18,24 +18,20 @@ class ChezmergeApp(App):
     }
 
     #view_theirs {
-        border-title: "Theirs (Diff vs Base)";
         background: $error 10%;
     }
 
     #view_base {
-        border-title: "Base (Common Ancestor)";
         background: $surface;
     }
 
     #view_ours {
-        border-title: "Ours (Diff vs Base)";
         background: $success 10%;
     }
 
     #editor {
         column-span: 3;
         border: solid $accent;
-        border-title: "Template Editor (Source)";
     }
     """
 
@@ -73,10 +69,10 @@ class ChezmergeApp(App):
 
         yield Header()
         with Container(classes="grid"):
-            yield Static(dummy_theirs_diff, id="view_theirs", classes="panel")
-            yield Static(dummy_base, id="view_base", classes="panel")
-            yield Static(dummy_ours_diff, id="view_ours", classes="panel")
-            yield TextArea(dummy_template, language="python", id="editor")
+            yield Static(dummy_theirs_diff, id="view_theirs", classes="panel", border_title="Theirs (Diff vs Base)")
+            yield Static(dummy_base, id="view_base", classes="panel", border_title="Base (Common Ancestor)")
+            yield Static(dummy_ours_diff, id="view_ours", classes="panel", border_title="Ours (Diff vs Base)")
+            yield TextArea(dummy_template, language="python", id="editor", border_title="Template Editor (Source)")
         yield Footer()
 
     def action_save_merge(self):
