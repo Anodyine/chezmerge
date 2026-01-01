@@ -1,0 +1,1 @@
+last session, we started working on a chezmerge project in src/chezmerge. Please read the CONTEXT.md, inspect the files, and come up with a plan for what to implement next. the project we are reimplementing is in reference-project, so please read those files as well.  
