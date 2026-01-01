@@ -34,13 +34,24 @@ def normalize_path(path_str: str) -> str:
         new_parts.append(p)
     return str(Path(*new_parts))
 
+def chezmoify_path(path_str: str) -> str:
+    """
+    Converts a standard path (e.g. '.config/foo') to a basic chezmoi source path 
+    (e.g. 'dot_config/foo').
+    Note: This is a basic implementation for the MVP import process.
+    """
+    parts = Path(path_str).parts
+    new_parts = []
+    for part in parts:
+        if part.startswith("."):
+            new_parts.append("dot_" + part[1:])
+        else:
+            new_parts.append(part)
+    return str(Path(*new_parts))
+
 def find_local_match(repo_root: Path, target_rel_path: str) -> Optional[Path]:
     """
     Scans the repo_root to find the local source file that generates the target_rel_path.
-    
-    Args:
-        repo_root: The root of the chezmoi source repo.
-        target_rel_path: The relative path of the file in the upstream repo (e.g. '.bashrc').
     """
     target_path = str(Path(target_rel_path))
     
