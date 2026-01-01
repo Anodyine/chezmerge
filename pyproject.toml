@@ -1,0 +1,13 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "chezmerge"
+version = "0.1.0"
+dependencies = [
+    "textual",
+]
+
+[project.scripts]
+chezmerge = "chezmerge.main:run"
