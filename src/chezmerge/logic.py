@@ -39,3 +39,13 @@ class DecisionEngine:
             return MergeScenario.AUTO_KEEP
             
         return MergeScenario.CONFLICT
+
+@dataclass
+class MergeItem:
+    """Represents the complete merge state for a single file."""
+    path: str
+    base: FileState
+    theirs: FileState
+    ours: FileState
+    template: FileState
+    scenario: MergeScenario = MergeScenario.CONFLICT

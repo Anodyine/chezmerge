@@ -1,81 +1,85 @@
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, Static, TextArea
-from textual.containers import Container
-from textual.binding import Binding
+from textual.containers import Grid
+from textual.widgets import Header, Footer, TextArea
+from .logic import MergeItem
 
-class ChezmergeApp(App):
+class ChezmergeApp(App[list[MergeItem]]):
     CSS = """
-    .grid {
+    Grid {
         layout: grid;
         grid-size: 3 2;
-        grid-rows: 1fr 1fr;
+        grid-rows: 1fr 2fr;
+        grid-columns: 1fr 1fr 1fr;
         height: 100%;
     }
 
-    .panel {
+    .pane {
         border: solid $secondary;
-        padding: 0 1;
+        height: 100%;
     }
 
-    #view_theirs {
-        background: $error 10%;
-    }
-
-    #view_base {
-        background: $surface;
-    }
-
-    #view_ours {
-        background: $success 10%;
-    }
-
-    #editor {
+    #template {
         column-span: 3;
-        border: solid $accent;
+        border: solid $primary;
     }
     """
 
     BINDINGS = [
-        Binding("ctrl+s", "save_merge", "Save & Continue"),
-        Binding("ctrl+q", "quit", "Quit"),
+        ("ctrl+s", "save_merge", "Save & Next"),
+        ("ctrl+q", "quit", "Quit"),
     ]
 
+    def __init__(self, items: list[MergeItem]):
+        super().__init__()
+        self.items = items
+        self.current_index = 0
+
     def compose(self) -> ComposeResult:
-        # Dummy Data for Visualization
-        dummy_base = "setting_a = 'default'\nsetting_b = 'off'"
-        
-        dummy_theirs_diff = (
-            "--- base\n"
-            "+++ theirs\n"
-            "@@ -1,2 +1,2 @@\n"
-            "-setting_a = 'default'\n"
-            "+setting_a = 'upstream_change'\n"
-            " setting_b = 'off'"
-        )
-        
-        dummy_ours_diff = (
-            "--- base\n"
-            "+++ ours\n"
-            "@@ -1,2 +1,2 @@\n"
-            " setting_a = 'default'\n"
-            "-setting_b = 'off'\n"
-            "+setting_b = 'local_change'"
-        )
-
-        dummy_template = (
-            "setting_a = '{{ .upstream_val }}'\n"
-            "setting_b = '{{ .local_val }}'"
-        )
-
         yield Header()
-        with Container(classes="grid"):
-            yield Static(dummy_theirs_diff, id="view_theirs", classes="panel", border_title="Theirs (Diff vs Base)")
-            yield Static(dummy_base, id="view_base", classes="panel", border_title="Base (Common Ancestor)")
-            yield Static(dummy_ours_diff, id="view_ours", classes="panel", border_title="Ours (Diff vs Base)")
-            yield TextArea(dummy_template, language="python", id="editor", border_title="Template Editor (Source)")
+        yield Grid(
+            # Top Row: Context (Read Only)
+            TextArea(id="theirs", read_only=True, classes="pane"),
+            TextArea(id="base", read_only=True, classes="pane"),
+            TextArea(id="ours", read_only=True, classes="pane"),
+            
+            # Bottom Row: Action (Editable)
+            TextArea(id="template", classes="pane"),
+        )
         yield Footer()
 
+    def on_mount(self):
+        self.load_current_item()
+
+    def load_current_item(self):
+        if not self.items or self.current_index >= len(self.items):
+            self.exit(self.items)
+            return
+
+        item = self.items[self.current_index]
+        self.sub_title = f"Merging [{self.current_index + 1}/{len(self.items)}]: {item.path}"
+
+        # Helper to set text and title
+        def set_pane(id, title, content):
+            widget = self.query_one(f"#{id}", TextArea)
+            widget.text = content
+            widget.border_title = title
+
+        set_pane("theirs", "Theirs (Upstream)", item.theirs.content)
+        set_pane("base", "Base (Ancestor)", item.base.content)
+        set_pane("ours", "Ours (Local)", item.ours.content)
+        
+        # Template is special: it gets focus
+        template_widget = self.query_one("#template", TextArea)
+        template_widget.text = item.template.content
+        template_widget.border_title = f"Template (Editable): {item.path}"
+        template_widget.focus()
+
     def action_save_merge(self):
-        """Handle the save action."""
-        # In the future, this will write the editor content to disk
-        self.exit(result="saved")
+        # Save current state back to the item
+        if self.current_index < len(self.items):
+            current_content = self.query_one("#template", TextArea).text
+            self.items[self.current_index].template.content = current_content
+
+        # Advance
+        self.current_index += 1
+        self.load_current_item()
