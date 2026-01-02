@@ -32,7 +32,7 @@ cd "$PROJECT_ROOT"
 
 # 2. Test Initialization
 echo -e "${GREEN}=== Testing Initialization ===${NC}"
-uv run src/chezmerge/main.py \
+uv run --directory "$PROJECT_ROOT" -m chezmerge.main \
     --repo "$REMOTE_REPO" \
     --source "$USER_DIR"
 
@@ -59,7 +59,7 @@ echo "# My local customization" >> "$USER_DIR/dot_bashrc"
 
 # 4. Test Update (Dry Run)
 echo -e "${GREEN}=== Testing Update Detection (Dry Run) ===${NC}"
-OUTPUT=$(uv run src/chezmerge/main.py \
+OUTPUT=$(uv run --directory "$PROJECT_ROOT" -m chezmerge.main \
     --repo "$REMOTE_REPO" \
     --source "$USER_DIR" \
     --dry-run)

@@ -2,23 +2,11 @@ import sys
 import argparse
 from pathlib import Path
 
-# Logic to handle running this file directly vs as a module
-if __name__ == "__main__" and __package__ is None:
-    src_path = Path(__file__).resolve().parent.parent
-    if str(src_path) not in sys.path:
-        sys.path.insert(0, str(src_path))
-    
-    from chezmerge.ui import ChezmergeApp
-    from chezmerge.logic import MergeItem, FileState, MergeScenario, DecisionEngine
-    from chezmerge.git_ops import GitHandler
-    from chezmerge.paths import find_local_match, normalize_path
-    from chezmerge.importer import import_upstream
-else:
-    from .ui import ChezmergeApp
-    from .logic import MergeItem, FileState, MergeScenario, DecisionEngine
-    from .git_ops import GitHandler
-    from .paths import find_local_match, normalize_path
-    from .importer import import_upstream
+from .ui import ChezmergeApp
+from .logic import MergeItem, FileState, MergeScenario, DecisionEngine
+from .git_ops import GitHandler
+from .paths import find_local_match, normalize_path
+from .importer import import_upstream
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Chezmerge: Intelligent Dotfile Merger")
