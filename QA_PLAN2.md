@@ -1,62 +1,63 @@
-# QA Plan 2: End-to-End Workflow (Real Upstream)
+# QA Plan 2: End-to-End Workflow (Local Repo)
 
 ## Objective
-Verify the full lifecycle using a real public repository that you control. This allows us to test the "Init" phase with real network cloning and the "Update" phase by actually pushing changes to the upstream repository.
+Verify the full lifecycle using a local git repository. This simulates a remote upstream without requiring network access or GitHub credentials.
 
 ## Prerequisites
 1.  `uv` installed.
 2.  `git` installed.
-3.  A GitHub account (or similar git hosting service).
 
 ## Test Steps
 
 ### 1. Setup "Upstream" Repository
-We need a repository to act as the source dotfiles.
+We will create a "bare" git repository to act as the server, and a "maintainer" folder to push changes to it.
 
-1.  **Create Repo**: Go to GitHub and create a new **public** repository named `chezmerge-test-dots`.
-2.  **Clone as Maintainer**: Open a terminal and clone this repo to a temporary location. This represents the "Maintainer's Workstation".
+1.  **Clean previous runs**:
     ```bash
-    git clone https://github.com/<YOUR_USERNAME>/chezmerge-test-dots.git /tmp/upstream-maintainer
-    cd /tmp/upstream-maintainer
+    rm -rf /tmp/qa-upstream.git /tmp/qa-maintainer /tmp/qa-local
     ```
-3.  **Add Initial Files**:
+
+2.  **Create the "Server"**:
     ```bash
-    # Create a basic bashrc
+    git init --bare /tmp/qa-upstream.git
+    ```
+
+3.  **Configure "Maintainer" and Initial Commit**:
+    ```bash
+    git clone /tmp/qa-upstream.git /tmp/qa-maintainer
+    cd /tmp/qa-maintainer
+    
+    # Create basic files
     echo "alias ll='ls -l'" > .bashrc
-    # Create a basic vimrc
     echo "set number" > .vimrc
     
     git add .
     git commit -m "Initial commit"
-    git push
+    git push origin master
     ```
 
 ### 2. Test Initialization (The User)
 Now act as the user installing these dotfiles.
 
-1.  **Prepare Local Directory**:
-    ```bash
-    rm -rf /tmp/local-chezmoi
-    ```
-2.  **Run Initialization**:
+1.  **Run Initialization**:
     ```bash
     # Run from your project root
     uv run src/chezmerge/main.py \
-      --repo https://github.com/<YOUR_USERNAME>/chezmerge-test-dots.git \
-      --source /tmp/local-chezmoi
+      --repo /tmp/qa-upstream.git \
+      --source /tmp/qa-local
     ```
 
 **Verification:**
-*   Check `/tmp/local-chezmoi`.
+*   Check `/tmp/qa-local`.
 *   It should contain `dot_bashrc` and `dot_vimrc`.
 *   It should contain `.merge_workspace/base` and `.merge_workspace/latest`.
 
 ### 3. Create Divergence (The "Merge" Scenario)
 
 **A. Update Upstream (Theirs)**
-Act as the maintainer again.
+Act as the maintainer pushing an update.
 ```bash
-cd /tmp/upstream-maintainer
+cd /tmp/qa-maintainer
 echo "alias gs='git status'" >> .bashrc
 git commit -am "Add git alias"
 git push
@@ -66,16 +67,17 @@ git push
 Act as the user customizing their files.
 ```bash
 # Edit the local chezmoi source file
-echo "# My local customization" >> /tmp/local-chezmoi/dot_bashrc
+echo "# My local customization" >> /tmp/qa-local/dot_bashrc
 ```
 
 ### 4. Test Update Workflow
-Run `chezmerge` again. It should fetch the new commits from GitHub and detect the conflict.
+Run `chezmerge` again. It should fetch the new commits from the local "upstream" and detect the conflict.
 
 ```bash
+# Run from your project root
 uv run src/chezmerge/main.py \
-  --repo https://github.com/<YOUR_USERNAME>/chezmerge-test-dots.git \
-  --source /tmp/local-chezmoi
+  --repo /tmp/qa-upstream.git \
+  --source /tmp/qa-local
 ```
 
 **Verification:**
@@ -84,15 +86,10 @@ uv run src/chezmerge/main.py \
     *   **Theirs**: Should show the new `alias gs`.
     *   **Ours**: Should show `# My local customization`.
 3.  **Action**:
-    *   Edit the **Template** pane to combine them:
-        ```bash
-        alias ll='ls -l'
-        alias gs='git status'
-        # My local customization
-        ```
+    *   Edit the **Template** pane to combine them.
     *   Press `Ctrl+S`.
 4.  **Result**:
     *   App exits.
-    *   Check `/tmp/local-chezmoi/dot_bashrc`. It should contain the combined content.
+    *   Check `/tmp/qa-local/dot_bashrc`. It should contain the combined content.
     *   Run the command again. It should say "No upstream changes detected".
 ```
