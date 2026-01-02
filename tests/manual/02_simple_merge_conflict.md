@@ -31,8 +31,8 @@ git push origin master
 cd "$QA_ROOT"
 # Run your tool to init
 
-export TOOL_REPO="~/repos/chezmerge"
-uv run $OLDPWD/src/chezmerge/main.py --repo "$QA_ROOT/upstream.git" --source "$QA_ROOT/local"
+export TOOL_REPO="$HOME/repos/chezmerge"
+uv run $TOOL_REPO/src/main.py --repo "$QA_ROOT/upstream.git" --source "$QA_ROOT/local"
 
 # 5. Create Conflict
 # Upstream adds a line
