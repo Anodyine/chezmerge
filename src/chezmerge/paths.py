@@ -16,6 +16,11 @@ def normalize_path(path_str: str) -> str:
     new_parts = []
     for part in parts:
         p = part
+        
+        # Handle .tmpl suffix
+        if p.endswith(".tmpl"):
+            p = p[:-5]
+
         # Iteratively strip prefixes
         while True:
             changed = False
