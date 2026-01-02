@@ -1,18 +1,22 @@
-# QA Plan: UI & Workflow Verification
+# 00 Simple Merge UI (Prototype)
 
 ## Objective
-Verify that the Textual TUI correctly renders the 4-way merge state, allows editing, and persists changes across a multi-file workflow.
+Verify that the Textual TUI correctly renders the 4-way merge state using **dummy data**. This test does not require a git repo; it tests the UI layout logic in isolation.
 
 ## Prerequisites
-1.  Ensure you are in the project root.
-2.  Ensure `uv` is installed.
+*   `uv` installed.
+*   **Set the Tool Path**:
+    ```bash
+    export TOOL_REPO="$HOME/repos/chezmerge"
+    ```
 
 ## Test Steps
 
 ### 1. Launch the Application
-Run the application using `uv`:
+Run the application using `uv`. Note: When running without arguments, the current prototype loads dummy data.
+
 ```bash
-uv run src/chezmerge/main.py
+uv run --directory "$TOOL_REPO" -m chezmerge.main
 ```
 
 ### 2. Verify Screen 1: `.bashrc`

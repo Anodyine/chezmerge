@@ -6,6 +6,10 @@ Verify that the TUI correctly displays conflicting changes from Upstream and Loc
 ## Prerequisites
 *   `uv` installed.
 *   `git` installed.
+*   **Set the Tool Path**:
+    ```bash
+    export TOOL_REPO="$HOME/repos/chezmerge"
+    ```
 
 ## 1. Setup Test Environment
 Run the following block in your terminal to create a fresh environment with a guaranteed conflict.
@@ -29,10 +33,9 @@ git push origin master
 
 # 4. Initialize User (Local)
 cd "$QA_ROOT"
-# Run your tool to init
-
-export TOOL_REPO="$HOME/repos/chezmerge"
-uv run $TOOL_REPO/src/chezmerge/main.py --repo "$QA_ROOT/upstream.git" --source "$QA_ROOT/local"
+uv run --directory "$TOOL_REPO" -m chezmerge.main \
+    --repo "$QA_ROOT/upstream.git" \
+    --source "$QA_ROOT/local"
 
 # 5. Create Conflict
 # Upstream adds a line
@@ -46,10 +49,12 @@ echo "# Local: Custom alias" >> "$QA_ROOT/local/dot_bashrc"
 ```
 
 ## 2. Execute Test
-Run the tool from your project root:
+Run the tool pointing to the test environment:
 
 ```bash
-uv run src/chezmerge/main.py --repo "/tmp/qa-02/upstream.git" --source "/tmp/qa-02/local"
+uv run --directory "$TOOL_REPO" -m chezmerge.main \
+    --repo "$QA_ROOT/upstream.git" \
+    --source "$QA_ROOT/local"
 ```
 
 ## 3. TUI Verification Steps
@@ -58,7 +63,7 @@ The TUI should launch. Verify the following:
 1.  **Layout**: You see three panes (Theirs, Result/Template, Ours).
 2.  **Theirs (Left/Top)**: Shows `alias gs='git status'`.
 3.  **Ours (Right/Bottom)**: Shows `# Local: Custom alias`.
-4.  **Result (Center)**: Shows the current local content (or a raw conflict marker if we implemented that, but currently it defaults to "Ours").
+4.  **Result (Center)**: Shows the current local content.
 
 ## 4. Interaction Steps
 1.  Click or navigate to the **Result/Template** pane.
@@ -87,7 +92,9 @@ alias gs='git status'
 ## 6. Idempotency Check
 Run the tool one last time:
 ```bash
-uv run src/chezmerge/main.py --repo "/tmp/qa-02/upstream.git" --source "/tmp/qa-02/local"
+uv run --directory "$TOOL_REPO" -m chezmerge.main \
+    --repo "$QA_ROOT/upstream.git" \
+    --source "$QA_ROOT/local"
 ```
 **Expected Output:**
 `No upstream changes detected.`
