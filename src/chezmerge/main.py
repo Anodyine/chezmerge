@@ -25,6 +25,7 @@ def parse_args():
     parser.add_argument("--repo", help="Upstream git repository URL")
     parser.add_argument("--inner-path", default="", help="Subdirectory inside upstream repo containing dotfiles")
     parser.add_argument("--source", default="~/.local/share/chezmoi", help="Local chezmoi source directory")
+    parser.add_argument("--dry-run", action="store_true", help="Simulate merge logic without launching UI")
     return parser.parse_args()
 
 def run():
@@ -115,6 +116,13 @@ def run():
     if not merge_items:
         print("All changes merged automatically.")
         git.update_base_pointer()
+        return
+
+    # Handle Dry Run
+    if args.dry_run:
+        print(f"Dry Run: {len(merge_items)} files require merging.")
+        for item in merge_items:
+            print(f"  - {item.path} [{item.scenario.name}]")
         return
 
     # Launch UI
