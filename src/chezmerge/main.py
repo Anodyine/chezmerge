@@ -1,5 +1,6 @@
 import sys
 import argparse
+import subprocess
 from pathlib import Path
 
 from .ui import ChezmergeApp
@@ -15,6 +16,23 @@ def parse_args():
     parser.add_argument("--source", default="~/.local/share/chezmoi", help="Local chezmoi source directory")
     parser.add_argument("--dry-run", action="store_true", help="Simulate merge logic without launching UI")
     return parser.parse_args()
+
+def render_chezmoi_template(content: str) -> str:
+    """
+    Renders the given template content using 'chezmoi execute-template'.
+    Returns the rendered string, or the original content if rendering fails.
+    """
+    try:
+        result = subprocess.run(
+            ["chezmoi", "execute-template"],
+            input=content,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        return result.stdout
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return content
 
 def run():
     args = parse_args()
@@ -77,11 +95,17 @@ def run():
         base_content = git.get_file_content("base", upstream_file)
         # Theirs: Content from 'latest' clone
         theirs_content = git.get_file_content("latest", upstream_file)
-        # Ours: Content from local disk (rendered? No, raw source for now)
-        ours_content = git.get_file_content("local", str(local_file))
         
-        # For MVP, Template is just Ours
-        template_content = ours_content
+        # Ours: Content from local disk
+        raw_local_content = git.get_file_content("local", str(local_file))
+        
+        # If it's a template, try to render it for the "Ours" view (comparison context)
+        ours_content = raw_local_content
+        if str(local_file).endswith(".tmpl"):
+            ours_content = render_chezmoi_template(raw_local_content)
+        
+        # Template view always needs the raw source for editing
+        template_content = raw_local_content
         
         base_state = FileState(base_content, rel_target_path)
         theirs_state = FileState(theirs_content, rel_target_path)
