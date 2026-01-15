@@ -7,6 +7,7 @@ class MergeScenario(Enum):
     AUTO_UPDATE = auto()     # Yours == Base, Theirs != Base
     AUTO_KEEP = auto()       # Yours != Base, Theirs == Base
     CONFLICT = auto()        # Yours != Base, Theirs != Base
+    AUTO_MERGEABLE = auto()  # Conflict resolved automatically by git
     TEMPLATE_DIVERGENCE = auto() # Template logic detected, requires manual review
 
 @dataclass

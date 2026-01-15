@@ -116,16 +116,26 @@ def run():
         
         scenario = engine.analyze(base_state, theirs_state, ours_state, template_state)
         
+        merged_content = None
+        if scenario == MergeScenario.CONFLICT and not is_tmpl:
+            success, result = git.attempt_merge(base_content, ours_content, theirs_content)
+            if success:
+                scenario = MergeScenario.AUTO_MERGEABLE
+                merged_content = result
+        
         if scenario == MergeScenario.ALREADY_SYNCED:
             continue
 
-        if scenario == MergeScenario.AUTO_UPDATE:
+        if scenario in (MergeScenario.AUTO_UPDATE, MergeScenario.AUTO_MERGEABLE):
             if args.dry_run:
-                print(f"  - {str(local_file)} [AUTO_UPDATE] (will be fast-forwarded)")
+                print(f"  - {str(local_file)} [{scenario.name}]")
             else:
-                print(f"Auto-merging {rel_target_path}...")
+                print(f"Auto-merging {rel_target_path} ({scenario.name})...")
                 dest = local_path / str(local_file)
-                dest.write_text(theirs_content)
+                # For AUTO_UPDATE, theirs_content is the target. 
+                # For AUTO_MERGEABLE, merged_content is the target.
+                content_to_write = merged_content if scenario == MergeScenario.AUTO_MERGEABLE else theirs_content
+                dest.write_text(content_to_write)
             continue
 
         merge_items.append(MergeItem(

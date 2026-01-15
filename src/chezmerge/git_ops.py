@@ -1,5 +1,6 @@
 import subprocess
 import shutil
+import tempfile
 from pathlib import Path
 from typing import Optional
 
@@ -98,3 +99,30 @@ class GitHandler:
         base_cwd = self.workspace / "base"
         self.run_git(["fetch", "origin"], cwd=base_cwd)
         self.run_git(["reset", "--hard", latest_sha], cwd=base_cwd)
+
+    def attempt_merge(self, base: str, ours: str, theirs: str) -> tuple[bool, str]:
+        """
+        Attempts a 3-way merge using 'git merge-file'.
+        Returns (success, merged_content).
+        """
+        with tempfile.NamedTemporaryFile(mode='w+', delete=True) as f_base, \
+             tempfile.NamedTemporaryFile(mode='w+', delete=True) as f_ours, \
+             tempfile.NamedTemporaryFile(mode='w+', delete=True) as f_theirs:
+            
+            f_base.write(base)
+            f_ours.write(ours)
+            f_theirs.write(theirs)
+            
+            f_base.flush()
+            f_ours.flush()
+            f_theirs.flush()
+
+            # git merge-file -p <current> <base> <other>
+            # -p sends result to stdout, returns 0 on success, positive on conflict
+            res = subprocess.run(
+                ["git", "merge-file", "-p", f_ours.name, f_base.name, f_theirs.name],
+                capture_output=True,
+                text=True
+            )
+            
+            return (res.returncode == 0, res.stdout)
