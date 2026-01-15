@@ -99,9 +99,11 @@ def run():
         # Ours: Content from local disk
         raw_local_content = git.get_file_content("local", str(local_file))
         
+        is_tmpl = str(local_file).endswith(".tmpl")
+
         # If it's a template, try to render it for the "Ours" view (comparison context)
         ours_content = raw_local_content
-        if str(local_file).endswith(".tmpl"):
+        if is_tmpl:
             ours_content = render_chezmoi_template(raw_local_content)
         
         # Template view always needs the raw source for editing
@@ -110,24 +112,35 @@ def run():
         base_state = FileState(base_content, rel_target_path)
         theirs_state = FileState(theirs_content, rel_target_path)
         ours_state = FileState(ours_content, str(local_file))
-        template_state = FileState(template_content, str(local_file), is_template=True)
+        template_state = FileState(template_content, str(local_file), is_template=is_tmpl)
         
         scenario = engine.analyze(base_state, theirs_state, ours_state, template_state)
         
-        # For MVP, we only show UI for conflicts or updates, skipping auto-synced
-        if scenario != MergeScenario.ALREADY_SYNCED:
-            merge_items.append(MergeItem(
-                path=str(local_file),
-                base=base_state,
-                theirs=theirs_state,
-                ours=ours_state,
-                template=template_state,
-                scenario=scenario
-            ))
+        if scenario == MergeScenario.ALREADY_SYNCED:
+            continue
+
+        if scenario == MergeScenario.AUTO_UPDATE:
+            if args.dry_run:
+                print(f"  - {str(local_file)} [AUTO_UPDATE] (will be fast-forwarded)")
+            else:
+                print(f"Auto-merging {rel_target_path}...")
+                dest = local_path / str(local_file)
+                dest.write_text(theirs_content)
+            continue
+
+        merge_items.append(MergeItem(
+            path=str(local_file),
+            base=base_state,
+            theirs=theirs_state,
+            ours=ours_state,
+            template=template_state,
+            scenario=scenario
+        ))
 
     if not merge_items:
         print("All changes merged automatically.")
-        git.update_base_pointer()
+        if not args.dry_run:
+            git.update_base_pointer()
         return
 
     # Handle Dry Run

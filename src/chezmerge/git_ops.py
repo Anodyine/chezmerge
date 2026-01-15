@@ -8,7 +8,7 @@ class GitHandler:
         self.repo_path = repo_path.resolve()
         self.workspace = self.repo_path / ".merge_workspace"
 
-    def run_git(self, args: list[str], cwd: Optional[Path] = None) -> str:
+    def run_git(self, args: list[str], cwd: Optional[Path] = None, strip: bool = True) -> str:
         """Executes a git command."""
         target_cwd = cwd if cwd else self.repo_path
         result = subprocess.run(
@@ -18,7 +18,7 @@ class GitHandler:
             text=True, 
             check=True
         )
-        return result.stdout.strip()
+        return result.stdout.strip() if strip else result.stdout
 
     def is_initialized(self) -> bool:
         return (self.workspace / "base").exists() and (self.workspace / "latest").exists()
@@ -62,7 +62,7 @@ class GitHandler:
         # For base/latest, read from the clone
         repo_dir = self.workspace / source
         try:
-            return self.run_git(["show", f"HEAD:{path}"], cwd=repo_dir)
+            return self.run_git(["show", f"HEAD:{path}"], cwd=repo_dir, strip=False)
         except subprocess.CalledProcessError:
             return ""
 
