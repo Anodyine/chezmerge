@@ -25,7 +25,7 @@ class GitHandler:
         return (self.workspace / "base").exists() and (self.workspace / "latest").exists()
 
     def init_workspace(self, remote_url: str):
-        """Sets up the .merge_workspace with base and latest submodules."""
+        """Sets up the .merge_workspace with base and latest clones."""
         self.workspace.mkdir(exist_ok=True)
         
         # Ensure main repo is initialized
@@ -34,7 +34,6 @@ class GitHandler:
 
         # We use git clones instead of submodules for the MVP to avoid 
         # complex submodule registration issues in the user's repo.
-        # This keeps the workspace ephemeral.
         print(f"Cloning {remote_url} into workspace...")
         
         for name in ["base", "latest"]:

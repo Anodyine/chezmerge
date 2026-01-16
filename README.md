@@ -21,7 +21,7 @@ Keeping your dotfiles in sync with an upstream repository (like [ML4W](https://g
 *   **External Editor Integration:**
     *   Seamlessly open the current merge in **Neovim**, **Vim**, or **Vi**.
     *   **Neovim Special:** Opens a custom 4-pane split layout (Theirs/Base/Ours on top, Result on bottom) for a professional merge experience.
-*   **Safety First:** Operates on git objects and temporary paths in a `.merge_workspace`. It does not overwrite your actual source files until you explicitly save the merge.
+*   **Safety First:** Operates on git objects and local clones in a `.merge_workspace`. It does not overwrite your actual source files until you explicitly save the merge.
 
 ## 🚀 Installation
 
