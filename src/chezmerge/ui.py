@@ -27,12 +27,38 @@ class ChezmergeApp(App[list[MergeItem]]):
     BINDINGS = [
         ("ctrl+s", "save_merge", "Save & Next"),
         ("ctrl+q", "quit", "Quit"),
+        ("ctrl+c", "copy", "Copy"),
+        ("ctrl+v", "paste", "Paste"),
+        ("ctrl+t", "cycle_focus", "Cycle Pane"),
     ]
 
     def __init__(self, items: list[MergeItem]):
         super().__init__()
         self.items = items
         self.current_index = 0
+
+    def action_copy(self):
+        widget = self.screen.focused
+        if isinstance(widget, TextArea):
+            self.copy_to_clipboard(widget.selected_text)
+            self.notify("Copied to clipboard")
+
+    def action_paste(self):
+        widget = self.screen.focused
+        if isinstance(widget, TextArea) and not widget.read_only:
+            self.paste_from_clipboard(lambda text: widget.replace_selection(text) if text else None)
+
+    def action_cycle_focus(self):
+        order = ["theirs", "base", "ours", "template"]
+        current = self.screen.focused
+
+        # Determine next pane
+        next_id = "template"
+        if current and current.id in order:
+            idx = order.index(current.id)
+            next_id = order[(idx + 1) % len(order)]
+
+        self.query_one(f"#{next_id}").focus()
 
     def compose(self) -> ComposeResult:
         yield Header()
