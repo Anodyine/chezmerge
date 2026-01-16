@@ -2,103 +2,121 @@
 
 **The intelligent merge assistant for Chezmoi users.**
 
-Keeping your dotfiles in sync with an upstream repository (like [ML4W](https://github.com/mylinuxforwork/dotfiles) or [Folke's dots](https://github.com/folke/dotfiles)) is difficult. When you customize your setup, you diverge from the source. When the upstream author updates their code, standard `git merge` often fails or overwrites your hard work—especially when dealing with Chezmoi templates.
+[![Built with Textual](https://img.shields.io/badge/Built%20with-Textual-000000.svg)](https://github.com/Textualize/textual)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+
+Keeping your dotfiles in sync with an upstream repository (like [ML4W](https://github.com/mylinuxforwork/dotfiles) or [Folke's dots](https://github.com/folke/dot)) is difficult. When you customize your setup, you diverge from the source. When the upstream author updates their code, standard `git merge` often fails or overwrites your hard work—especially when dealing with Chezmoi templates.
 
 **Chezmerge** solves this by providing a dedicated **Terminal User Interface (TUI)** to visualize, edit, and resolve conflicts between your local customizations and upstream updates.
 
+---
+
 ## ✨ Features
 
-*   **Visual 3-Way Merge:** See exactly what changed.
-    *   **Theirs:** The new upstream version.
-    *   **Base:** The common ancestor (what the file looked like before updates).
-    *   **Ours:** Your current local version.
-    *   **Result:** The editable output template.
-*   **Template Awareness:** Understands `chezmoi` file naming conventions (`dot_`, `private_`, `executable_`).
-*   **Smart Analysis:** Automatically detects:
-    *   Files you haven't touched (Safe to update).
-    *   Files you customized but they didn't touch (Safe to keep).
-    *   **Conflicts:** Files changed by both parties.
-*   **External Editor Integration:**
-    *   Seamlessly open the current merge in **Neovim**, **Vim**, or **Vi**.
-    *   **Neovim Special:** Opens a custom 4-pane split layout (Theirs/Base/Ours on top, Result on bottom) for a professional merge experience.
-*   **Safety First:** Operates on git objects and a local submodule in `.chezmerge-upstream`. It does not overwrite your actual source files until you explicitly save the merge.
+* **Visual 3-Way Merge:** See exactly what changed across three panes (Theirs, Base, Ours).
+* **Template Awareness:** Understands `chezmoi` file naming conventions (`dot_`, `private_`, `executable_`).
+* **Smart Analysis:** Automatically detects safe updates versus complex conflicts.
+* **External Editor Integration:** * Seamlessly open the current merge in **Neovim**, **Vim**, or **Vi**.
+    * **Neovim Special:** Launches a custom 4-pane split layout designed specifically for merging.
+* **Safety First:** Operates on git objects and a local submodule in `.chezmerge-upstream`. Your actual source files are only updated once you explicitly save a merge.
+
+---
 
 ## 🚀 Installation
 
-Chezmerge is a Python package managed with `uv`.
+Because Chezmerge is currently in development, you install it by cloning the source and installing it as a local tool.
 
-### Prerequisites
-*   Python 3.10+
-*   Git
-*   (Optional) Neovim or Vim for external editing.
+### 1. Prerequisites
+* **Python 3.10+**
+* **Git**
+* **uv** (Recommended) or **pip**
 
-### Installing
-
-Navigate to your project directory and install:
+### 2. Clone and Install
+Cloning the repository allows you to install the package in "editable" mode or as a global tool.
 
 ```bash
-# Using uv (Recommended)
+# Clone the repository
+git clone [https://github.com/your-username/chezmerge.git](https://github.com/your-username/chezmerge.git)
+cd chezmerge
+
+# Install as a global tool using uv (Recommended)
 uv tool install .
 
-# Or using pip
+# OR install via pip
 pip install .
 ```
+> [!TIP]
+> **Why uv?** Using `uv tool install` creates an isolated virtual environment for Chezmerge so its dependencies won't conflict with other Python projects on your system.
 
-## 🛠 Usage
+---
 
-1.  **Navigate to your chezmoi source directory:**
-    ```bash
-    cd $(chezmoi source-path)
+## 🛠 Usage & Quick Start
+
+### 1. Navigate to your chezmoi source directory
+You must run Chezmerge from the root of your Chezmoi source:
+```bash
+cd $(chezmoi source-path)
     ```
 
-2.  **Run Chezmerge:**
-    ```bash
-    chezmerge --repo <upstream_git_url>
-    ```
-    *Example:*
-    ```bash
-    chezmerge --repo https://github.com/mylinuxforwork/dotfiles.git
-    ```
-    
-    **Options:**
-    *   `--dry-run`: Simulate the merge process and print what would happen without changing any files.
-    *   `--inner-path <path>`: Specify a subdirectory in the upstream repo if the dotfiles aren't at the root (e.g., `--inner-path dotfiles`).
+### 2. Run Chezmerge
+Point the tool to the upstream repository you want to sync with.
+```bash
+chezmerge --repo [https://github.com/mylinuxforwork/dotfiles.git](https://github.com/mylinuxforwork/dotfiles.git)
+```
+*Example:*
+```bash
+chezmerge --repo https://github.com/mylinuxforwork/dotfiles.git
+```
+ **Common Options:**
+* `--inner-path <path>`: If the dotfiles aren't at the repo root (e.g., `--inner-path dotfiles`).
+* `--branch <name>`: Sync with a specific branch (defaults to the remote's default branch).
+* `--dry-run`: Simulate the process without changing any files.
 
-3.  **The Merge Process:**
-    The application will fetch the latest upstream changes into a local submodule (`.chezmerge-upstream`) and analyze them against your local files.
-
+### 3. The Merge Process
+1.  **Analysis:** Chezmerge fetches upstream changes into `.chezmerge-upstream` and compares them to your local files.
+2.  **Auto-Merge:** Files you haven't touched are updated automatically.
+3.  **Conflict Resolution:** If both you and upstream changed a file, the TUI opens.
+4.  **Finalize:** Once all conflicts are resolved, Chezmerge stages the changes. You simply need to commit them:
+```bash
+git commit -m "chore: sync with upstream via chezmerge"
+```
 ## 🧠 How It Works
 
 Chezmerge uses a **3-way merge strategy** to determine how to handle every file. It compares three versions of every file:
+
 1.  **Base:** The state of the file from the last time you synced (the current commit of the submodule).
 2.  **Theirs:** The new version from the upstream repository.
 3.  **Ours:** Your current local version.
+
+
 
 Based on the differences, it assigns one of the following scenarios:
 
 ### 🟢 Automatic Actions (No User Intervention)
 
-*   **Safe Update (`AUTO_UPDATE`):**
-    *   *Logic:* You haven't changed the file (`Ours == Base`), but upstream has (`Theirs != Base`).
-    *   *Action:* Chezmerge automatically updates your file to match upstream.
-*   **Keep Local (`AUTO_KEEP`):**
-    *   *Logic:* You customized the file (`Ours != Base`), but upstream hasn't touched it (`Theirs == Base`).
-    *   *Action:* Chezmerge keeps your custom version.
-*   **Already Synced (`ALREADY_SYNCED`):**
-    *   *Logic:* Your file is already identical to the upstream version.
-    *   *Action:* Skipped.
-*   **Auto-Mergeable (`AUTO_MERGEABLE`):**
-    *   *Logic:* Both you and upstream changed the file, but in different places. Git can resolve this mathematically without conflicts.
-    *   *Action:* Chezmerge applies the merge automatically.
+* **Safe Update (`AUTO_UPDATE`):**
+    * *Logic:* You haven't changed the file (`Ours == Base`), but upstream has (`Theirs != Base`).
+    * *Action:* Chezmerge automatically updates your file to match upstream.
+* **Keep Local (`AUTO_KEEP`):**
+    * *Logic:* You customized the file (`Ours != Base`), but upstream hasn't touched it (`Theirs == Base`).
+    * *Action:* Chezmerge keeps your custom version.
+* **Already Synced (`ALREADY_SYNCED`):**
+    * *Logic:* Your file is already identical to the upstream version.
+    * *Action:* Skipped.
+* **Auto-Mergeable (`AUTO_MERGEABLE`):**
+    * *Logic:* Both you and upstream changed the file, but in different places. Git can resolve this mathematically without conflicts.
+    * *Action:* Chezmerge applies the merge automatically.
 
 ### 🔴 Manual Intervention (Opens TUI)
 
-*   **Conflict (`CONFLICT`):**
-    *   *Logic:* Both you and upstream changed the same lines of code. Git cannot resolve this automatically.
-    *   *Action:* Opens the **Interactive TUI** so you can manually edit the result.
-*   **Template Divergence (`TEMPLATE_DIVERGENCE`):**
-    *   *Logic:* The file is a Chezmoi template (`.tmpl`). Because templates contain logic that generates content, standard text merging is risky.
-    *   *Action:* Unless the files are identical, Chezmerge treats this as a conflict and opens the TUI. This ensures you can verify that your template logic (variables, conditionals) is preserved correctly against upstream changes.
+* **Conflict (`CONFLICT`):**
+    * *Logic:* Both you and upstream changed the same lines of code. Git cannot resolve this automatically.
+    * *Action:* Opens the **Interactive TUI** so you can manually edit the result.
+* **Template Divergence (`TEMPLATE_DIVERGENCE`):**
+    * *Logic:* The file is a Chezmoi template (`.tmpl`). Because templates contain logic that generates content, standard text merging is risky.
+    * *Action:* Unless the files are identical, Chezmerge treats this as a conflict and opens the TUI. This ensures you can verify that your template logic is preserved correctly.
+
+---
 
 ## 🖥️ The Interactive TUI
 
@@ -118,9 +136,9 @@ When manual intervention is required, the TUI launches with a grid layout:
 | `Ctrl+t` | **Cycle Focus** between the panes. |
 | `Ctrl+m` | **Open External Editor** (Vim/Neovim). |
 | `Ctrl+s` | **Save & Next**. Saves the current file and moves to the next conflict. |
-| `Ctrl+c` | Copy selected text. |
-| `Ctrl+v` | Paste text into the Template pane. |
-| `Ctrl+q` | Quit the application. |
+| `Ctrl+q` | **Quit** the application. |
+
+---
 
 ## 📝 External Editor Workflow
 
@@ -143,22 +161,20 @@ If `nvim` is detected, Chezmerge opens a specialized layout designed for merging
 +-----------------------------------------------------+
 ```
 
-*   **Navigation:** Use `Ctrl+w` + `h/j/k/l` to move between splits.
-*   **Editing:** Edit the bottom window.
-*   **Finish:** Save and quit (`:wq`). The content will be loaded back into the TUI.
+* **Navigation:** Use `Ctrl+w` + `h/j/k/l` to move between splits.
+* **Editing:** Edit the bottom window.
+* **Finish:** Save and quit (`:wq`). The content will be loaded back into the TUI.
 
-### Vim/Vi Users
-Opens the four files in separate tabs (`-p` mode). Use `gt` and `gT` to switch tabs.
+---
 
 ## 📂 Project Structure
 
-*   `src/chezmerge/`: Source code.
-    *   `ui.py`: The Textual TUI implementation.
-    *   `logic.py`: The 3-way merge decision engine.
-    *   `git_ops.py`: Git command wrappers and workspace management.
-    *   `importer.py`: Handles initial import of upstream files.
-    *   `paths.py`: Utilities for normalizing Chezmoi paths (handling `dot_`, `private_` prefixes).
-*   `dev_logs/`: Development history.
+* `src/chezmerge/ui.py`: The Textual TUI implementation.
+* `src/chezmerge/logic.py`: The 3-way merge decision engine.
+* `src/chezmerge/git_ops.py`: Git command wrappers and workspace management.
+* `src/chezmerge/paths.py`: Utilities for normalizing Chezmoi paths (handling `dot_`, `private_` prefixes).
+
+---
 
 ## ⚠️ Important Note on Submodules
 
