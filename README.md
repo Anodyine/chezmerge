@@ -36,11 +36,16 @@ Cloning the repository allows you to install the package in "editable" mode or a
 
 ```bash
 # Clone the repository
-git clone [https://github.com/your-username/chezmerge.git](https://github.com/your-username/chezmerge.git)
+git clone https://github.com/anodyine/chezmerge.git
 cd chezmerge
 
 # Install as a global tool using uv (Recommended)
 uv tool install .
+```
+OR
+```bash
+git clone https://github.com/anodyine/chezmerge.git
+cd chezmerge
 
 # OR install via pip
 pip install .
@@ -56,13 +61,10 @@ pip install .
 You must run Chezmerge from the root of your Chezmoi source:
 ```bash
 cd $(chezmoi source-path)
-    ```
+```
 
 ### 2. Run Chezmerge
 Point the tool to the upstream repository you want to sync with.
-```bash
-chezmerge --repo [https://github.com/mylinuxforwork/dotfiles.git](https://github.com/mylinuxforwork/dotfiles.git)
-```
 *Example:*
 ```bash
 chezmerge --repo https://github.com/mylinuxforwork/dotfiles.git
