@@ -54,8 +54,8 @@ def run():
         git.init_workspace(args.repo)
         
         print("Performing initial import...")
-        # Import from 'base' (which is same as latest initially)
-        import_upstream(git.workspace / "base", local_path, args.inner_path)
+        # Import from the submodule
+        import_upstream(git.upstream_path, local_path, args.inner_path)
         
         print("Initialization complete. You can now run 'chezmoi apply'.")
         return
@@ -65,7 +65,7 @@ def run():
     git.fetch_latest()
     
     # Identify changed files between base and latest
-    changed_files = git.get_changed_files_between_clones(args.inner_path)
+    changed_files = git.get_upstream_changes(args.inner_path)
     
     if not changed_files:
         print("No upstream changes detected.")
@@ -136,6 +136,7 @@ def run():
                 # For AUTO_MERGEABLE, merged_content is the target.
                 content_to_write = merged_content if scenario == MergeScenario.AUTO_MERGEABLE else theirs_content
                 dest.write_text(content_to_write)
+                git.stage_file(str(local_file))
             continue
 
         merge_items.append(MergeItem(
@@ -151,6 +152,8 @@ def run():
         print("All changes merged automatically.")
         if not args.dry_run:
             git.update_base_pointer()
+            git.commit("chore(chezmerge): Merge upstream changes")
+            print("Merge complete. Changes committed.")
         return
 
     # Handle Dry Run
@@ -170,11 +173,13 @@ def run():
             # Write the template content back to the local file
             dest = local_path / item.path
             dest.write_text(item.template.content)
+            git.stage_file(item.path)
             print(f"Updated {item.path}")
         
         # Update base pointer so we don't process these again
         git.update_base_pointer()
-        print("Merge complete.")
+        git.commit("chore(chezmerge): Merge upstream changes")
+        print("Merge complete. Changes committed.")
 
 if __name__ == "__main__":
     run()

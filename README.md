@@ -21,7 +21,7 @@ Keeping your dotfiles in sync with an upstream repository (like [ML4W](https://g
 *   **External Editor Integration:**
     *   Seamlessly open the current merge in **Neovim**, **Vim**, or **Vi**.
     *   **Neovim Special:** Opens a custom 4-pane split layout (Theirs/Base/Ours on top, Result on bottom) for a professional merge experience.
-*   **Safety First:** Operates on git objects and local clones in a `.merge_workspace`. It does not overwrite your actual source files until you explicitly save the merge.
+*   **Safety First:** Operates on git objects and a local submodule in `.chezmerge-upstream`. It does not overwrite your actual source files until you explicitly save the merge.
 
 ## 🚀 Installation
 
@@ -65,12 +65,12 @@ pip install .
     *   `--inner-path <path>`: Specify a subdirectory in the upstream repo if the dotfiles aren't at the root (e.g., `--inner-path dotfiles`).
 
 3.  **The Merge Process:**
-    The application will fetch the latest upstream changes into a local workspace (`.merge_workspace`) and analyze them against your local files.
+    The application will fetch the latest upstream changes into a local submodule (`.chezmerge-upstream`) and analyze them against your local files.
 
 ## 🧠 How It Works
 
 Chezmerge uses a **3-way merge strategy** to determine how to handle every file. It compares three versions of every file:
-1.  **Base:** The state of the file from the last time you synced.
+1.  **Base:** The state of the file from the last time you synced (the current commit of the submodule).
 2.  **Theirs:** The new version from the upstream repository.
 3.  **Ours:** Your current local version.
 
@@ -160,11 +160,6 @@ Opens the four files in separate tabs (`-p` mode). Use `gt` and `gT` to switch t
     *   `paths.py`: Utilities for normalizing Chezmoi paths (handling `dot_`, `private_` prefixes).
 *   `dev_logs/`: Development history.
 
-## ⚠️ Important Note on .gitignore
+## ⚠️ Important Note on Submodules
 
-Chezmerge downloads upstream repositories into a local cache directory. Ensure this is ignored in your dotfiles repo to prevent committing the upstream source code.
-
-Add this to your `.gitignore`:
-```text
-.merge_workspace/
-```
+Chezmerge uses a Git submodule to track the upstream repository. This means the upstream state is explicitly versioned within your dotfiles repository. When you complete a merge, Chezmerge will stage the updated submodule pointer for you to commit.

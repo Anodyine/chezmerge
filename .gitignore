@@ -8,5 +8,3 @@ __pycache__/
 venv/
 *.egg-info/
 
-# Chezmerge
-.merge_workspace/
