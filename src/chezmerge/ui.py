@@ -96,11 +96,27 @@ class ChezmergeApp(App[list[MergeItem]]):
             base_file.write_text(base)
             ours_file.write_text(ours)
 
+            # Prepare command
+            cmd = [editor]
+
+            # Check if we are using neovim for the custom layout
+            if "nvim" in Path(editor).name:
+                # Layout: Top row (Theirs, Base, Ours), Bottom row (Result)
+                cmd.append(str(result_file))
+                cmd.extend([
+                    "-c", f"topleft split {base_file} | set readonly",
+                    "-c", f"vertical leftabove split {theirs_file} | set readonly",
+                    "-c", "wincmd l",  # Move back to Base
+                    "-c", f"vertical rightbelow split {ours_file} | set readonly",
+                    "-c", "wincmd j",  # Move down to Result
+                ])
+            else:
+                # Fallback for vim/vi: Open in tabs
+                cmd.extend(["-p", str(result_file), str(theirs_file), str(base_file), str(ours_file)])
+
             # Suspend and run editor
             with self.suspend():
-                subprocess.call(
-                    [editor, "-p", str(result_file), str(theirs_file), str(base_file), str(ours_file)]
-                )
+                subprocess.call(cmd)
 
             # Read back result
             if result_file.exists():
