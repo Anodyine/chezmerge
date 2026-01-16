@@ -1,3 +1,9 @@
+import os
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
+
 from textual.app import App, ComposeResult
 from textual.containers import Grid
 from textual.widgets import Header, Footer, TextArea
@@ -30,6 +36,7 @@ class ChezmergeApp(App[list[MergeItem]]):
         ("ctrl+c", "copy", "Copy"),
         ("ctrl+v", "paste", "Paste"),
         ("ctrl+t", "cycle_focus", "Cycle Pane"),
+        ("ctrl+m", "edit_external", "Vim/External Editor"),
     ]
 
     def __init__(self, items: list[MergeItem]):
@@ -59,6 +66,47 @@ class ChezmergeApp(App[list[MergeItem]]):
             next_id = order[(idx + 1) % len(order)]
 
         self.query_one(f"#{next_id}").focus()
+
+    def action_edit_external(self) -> None:
+        """Launch an external editor to handle the merge."""
+        editor = shutil.which("nvim") or shutil.which("vim") or shutil.which("vi")
+        if not editor:
+            self.notify("No editor found (nvim/vim/vi)", severity="error")
+            return
+
+        # Get current content from widgets
+        theirs = self.query_one("#theirs", TextArea).text
+        base = self.query_one("#base", TextArea).text
+        ours = self.query_one("#ours", TextArea).text
+        template_widget = self.query_one("#template", TextArea)
+        template = template_widget.text
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+
+            # Define files
+            result_file = tmp_path / "MERGE_RESULT.txt"
+            theirs_file = tmp_path / "theirs.txt"
+            base_file = tmp_path / "base.txt"
+            ours_file = tmp_path / "ours.txt"
+
+            # Write content
+            result_file.write_text(template)
+            theirs_file.write_text(theirs)
+            base_file.write_text(base)
+            ours_file.write_text(ours)
+
+            # Suspend and run editor
+            with self.suspend():
+                subprocess.call(
+                    [editor, "-p", str(result_file), str(theirs_file), str(base_file), str(ours_file)]
+                )
+
+            # Read back result
+            if result_file.exists():
+                new_content = result_file.read_text()
+                template_widget.text = new_content
+                self.notify("Returned from external editor")
 
     def compose(self) -> ComposeResult:
         yield Header()
