@@ -67,7 +67,7 @@ cd $(chezmoi source-path)
 Point the tool to the upstream repository you want to sync with.
 *Example:*
 ```bash
-chezmerge --repo https://github.com/mylinuxforwork/dotfiles.git
+chezmerge --repo https://github.com/mylinuxforwork/dotfiles.git --inner-path dotfiles
 ```
  **Common Options:**
 * `--inner-path <path>`: If the dotfiles aren't at the repo root (e.g., `--inner-path dotfiles`).
