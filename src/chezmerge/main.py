@@ -21,10 +21,14 @@ def render_chezmoi_template(content: str) -> str:
     """
     Renders the given template content using 'chezmoi execute-template'.
     Returns the rendered string, or the original content if rendering fails.
+
+    Note: chezmoi automatically discovers its configuration in standard 
+    locations (e.g., ~/.config/chezmoi/chezmoi.toml).
     """
     cmd = ["chezmoi", "execute-template"]
 
-    # Support custom config file via env var, useful for testing and custom setups
+    # Support custom config file via env var, useful for testing and custom setups.
+    # By default, chezmoi automatically discovers the config in standard locations.
     config_path = os.environ.get("CHEZMOI_CONFIG")
     if config_path:
         cmd.extend(["--config", config_path])
@@ -147,6 +151,10 @@ def run():
                 # For AUTO_UPDATE, theirs_content is the target. 
                 # For AUTO_MERGEABLE, merged_content is the target.
                 content_to_write = merged_content if scenario == MergeScenario.AUTO_MERGEABLE else theirs_content
+                
+                if content_to_write is None:
+                    raise RuntimeError(f"Unexpected None content for {scenario.name}")
+
                 dest.write_text(content_to_write)
                 git.stage_file(str(local_file))
             continue
