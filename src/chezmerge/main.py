@@ -1,9 +1,9 @@
 import sys
 import argparse
 import subprocess
+import os
 from pathlib import Path
 
-from .ui import ChezmergeApp
 from .logic import MergeItem, FileState, MergeScenario, DecisionEngine
 from .git_ops import GitHandler
 from .paths import find_local_match, normalize_path
@@ -22,16 +22,28 @@ def render_chezmoi_template(content: str) -> str:
     Renders the given template content using 'chezmoi execute-template'.
     Returns the rendered string, or the original content if rendering fails.
     """
+    cmd = ["chezmoi", "execute-template"]
+
+    # Support custom config file via env var, useful for testing and custom setups
+    config_path = os.environ.get("CHEZMOI_CONFIG")
+    if config_path:
+        cmd.extend(["--config", config_path])
+
     try:
         result = subprocess.run(
-            ["chezmoi", "execute-template"],
+            cmd,
             input=content,
             capture_output=True,
             text=True,
             check=True
         )
         return result.stdout
-    except (subprocess.CalledProcessError, FileNotFoundError):
+    except subprocess.CalledProcessError as e:
+        # Print warning to stderr so it doesn't break stdout flow but is visible
+        print(f"Warning: Template rendering failed: {e.stderr.strip()}", file=sys.stderr)
+        return content
+    except FileNotFoundError:
+        print("Warning: 'chezmoi' executable not found. Cannot render template.", file=sys.stderr)
         return content
 
 def run():
@@ -164,6 +176,7 @@ def run():
         return
 
     # Launch UI
+    from .ui import ChezmergeApp
     app = ChezmergeApp(merge_items)
     results = app.run()
     

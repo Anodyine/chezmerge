@@ -41,8 +41,11 @@ uv run --directory "$TOOL_REPO" -m chezmerge.main \
 cd "$QA_ROOT/local"
 mv dot_bashrc dot_bashrc.tmpl
 echo "alias ll='ls -{{ .ls_flags }}'" > dot_bashrc.tmpl
-# Note: In a real chezmoi repo, .ls_flags would be in a data file. 
-# For this test, we are verifying the TUI presents the .tmpl file for editing.
+
+echo '[data]' > "$QA_ROOT/chezmoi.toml"
+echo '    ls_flags = "lah"' >> "$QA_ROOT/chezmoi.toml"
+export CHEZMOI_CONFIG="$QA_ROOT/chezmoi.toml"
+# ------------------------------------------------
 
 # 5. Create Upstream Change
 cd "$QA_ROOT/maintainer"
@@ -52,9 +55,10 @@ git push
 ```
 
 ## 2. Execute Test
-Run the tool:
+Run the tool (ensure CHEZMOI_CONFIG is set):
 
 ```bash
+export CHEZMOI_CONFIG="$QA_ROOT/chezmoi.toml"
 uv run --directory "$TOOL_REPO" -m chezmerge.main \
     --repo "$QA_ROOT/upstream.git" \
     --source "$QA_ROOT/local"
@@ -67,7 +71,11 @@ uv run --directory "$TOOL_REPO" -m chezmerge.main \
     alias ll='ls -l'
     alias gs='git status'
     ```
-3.  **Ours (Context)**: Should show your local rendered version (if the engine supports rendering) or the previous base.
+3.  **Ours (Context)**: Should show the **RENDERED** local version:
+    ```bash
+    alias ll='ls -lah'
+    ```
+    *(Note: It will NOT show `{{ .ls_flags }}` here anymore)*
 4.  **Template (Editor)**: **CRITICAL**: This pane must show the raw template logic:
     ```bash
     alias ll='ls -{{ .ls_flags }}'

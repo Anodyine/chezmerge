@@ -57,8 +57,10 @@ def chezmoify_path(path_str: str) -> str:
 def find_local_match(repo_root: Path, target_rel_path: str) -> Optional[Path]:
     """
     Scans the repo_root to find the local source file that generates the target_rel_path.
+    Prioritizes .tmpl files if multiple matches exist.
     """
     target_path = str(Path(target_rel_path))
+    best_match = None
     
     # Walk the local repository to find a matching path.
     for candidate in repo_root.rglob("*"):
@@ -73,6 +75,11 @@ def find_local_match(repo_root: Path, target_rel_path: str) -> Optional[Path]:
         normalized = normalize_path(str(rel_candidate))
         
         if normalized == target_path:
-            return rel_candidate
+            # If we find a template, it is the preferred match. Return immediately.
+            if candidate.name.endswith(".tmpl"):
+                return rel_candidate
             
-    return None
+            # Otherwise, store it as a candidate and keep looking
+            best_match = rel_candidate
+            
+    return best_match

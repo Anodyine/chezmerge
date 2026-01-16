@@ -23,6 +23,13 @@ def import_upstream(source_dir: Path, target_dir: Path, inner_path: str = ""):
             # Convert to chezmoi path (e.g. dot_config/nvim/init.vim)
             chez_path = chezmoify_path(str(rel_path))
             
+            # Check if a template version already exists locally
+            # If so, we skip importing the raw file to avoid ambiguity
+            dest_tmpl = target_dir / (chez_path + ".tmpl")
+            if dest_tmpl.exists():
+                print(f"  Skipping {chez_path} (Template exists: {dest_tmpl.name})")
+                continue
+
             dest = target_dir / chez_path
             
             # Create parent dirs
