@@ -1,0 +1,7 @@
+Line 01: Common Header
+Line 02: Keep Unchanged
+Line 04: To be DELETED by Local (Ours)
+Line 05: To be MODIFIED by Upstream (Theirs) - UPSTREAM CHANGE
+Line 06: To be MODIFIED by Local (Ours)
+Line 07: Keep Unchanged
+Line 09: ADDED by Upstream (Theirs)
