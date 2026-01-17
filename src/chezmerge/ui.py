@@ -39,10 +39,11 @@ class ChezmergeApp(App[list[MergeItem]]):
         ("ctrl+m", "edit_external", "Vim/External Editor"),
     ]
 
-    def __init__(self, items: list[MergeItem]):
+    def __init__(self, items: list[MergeItem], external_editor: str | None = None):
         super().__init__()
         self.items = items
         self.current_index = 0
+        self.external_editor = external_editor
 
     def action_copy(self):
         widget = self.screen.focused
@@ -69,9 +70,13 @@ class ChezmergeApp(App[list[MergeItem]]):
 
     def action_edit_external(self) -> None:
         """Launch an external editor to handle the merge."""
-        editor = shutil.which("nvim") or shutil.which("vim") or shutil.which("vi")
+        if self.external_editor:
+            editor = shutil.which(self.external_editor) or self.external_editor
+        else:
+            editor = shutil.which("nvim") or shutil.which("vim") or shutil.which("vi")
+
         if not editor:
-            self.notify("No editor found (nvim/vim/vi)", severity="error")
+            self.notify("No editor found", severity="error")
             return
 
         # Get current content from widgets
@@ -116,13 +121,18 @@ class ChezmergeApp(App[list[MergeItem]]):
 
             # Suspend and run editor
             with self.suspend():
-                subprocess.call(cmd)
+                exit_code = subprocess.call(cmd)
 
             # Read back result
             if result_file.exists():
                 new_content = result_file.read_text()
                 template_widget.text = new_content
-                self.notify("Returned from external editor")
+
+                # If in auto-mode (CLI arg) and editor exited cleanly, save and next immediately
+                if self.external_editor and exit_code == 0:
+                    self.action_save_merge()
+                else:
+                    self.notify("Returned from external editor")
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -163,6 +173,11 @@ class ChezmergeApp(App[list[MergeItem]]):
         template_widget.text = item.template.content
         template_widget.border_title = f"Template (Editable): {item.path}"
         template_widget.focus()
+
+        # Auto-launch external editor if configured
+        if self.external_editor:
+            # Use call_later to trigger immediately without waiting for a UI render
+            self.call_later(self.action_edit_external)
 
     def action_save_merge(self):
         # Save current state back to the item

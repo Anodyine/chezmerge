@@ -14,6 +14,7 @@ def parse_args():
     parser.add_argument("--repo", help="Upstream git repository URL")
     parser.add_argument("--inner-path", default="", help="Subdirectory inside upstream repo containing dotfiles")
     parser.add_argument("--source", default="~/.local/share/chezmoi", help="Local chezmoi source directory")
+    parser.add_argument("--editor", help="External editor to use for merges (e.g. nvim, vim, vi)")
     parser.add_argument("--dry-run", action="store_true", help="Simulate merge logic without launching UI")
     return parser.parse_args()
 
@@ -185,7 +186,7 @@ def run():
 
     # Launch UI
     from .ui import ChezmergeApp
-    app = ChezmergeApp(merge_items)
+    app = ChezmergeApp(merge_items, external_editor=args.editor)
     results = app.run()
     
     if results:
