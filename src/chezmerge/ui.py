@@ -106,15 +106,38 @@ class ChezmergeApp(App[list[MergeItem]]):
 
             # Check if we are using neovim for the custom layout
             if "nvim" in Path(editor).name:
-                # Layout: Top row (Theirs, Base, Ours), Bottom row (Result)
+                # Create a vim script to handle layout and highlighting
+                # This avoids the "Too many arguments" error with multiple -c flags
+                vim_script = tmp_path / "layout.vim"
+                script_content = [
+                    "highlight DiffAddGreen ctermbg=Green guibg=Green ctermfg=Black guifg=Black",
+                    "highlight DiffTextGreen ctermbg=Green guibg=Green ctermfg=Black guifg=Black",
+                    "highlight DiffAddRed ctermbg=Red guibg=Red ctermfg=Black guifg=Black",
+                    "highlight DiffTextRed ctermbg=Red guibg=Red ctermfg=Black guifg=Black",
+                    "highlight DiffChangeNone ctermbg=None guibg=None",
+                    "highlight DiffDeleteRed ctermbg=Red guibg=Red ctermfg=Black guifg=Black",
+                    "highlight DiffDeleteGreen ctermbg=Green guibg=Green ctermfg=Black guifg=Black",
+                    
+                    f"topleft split {base_file} | set readonly",
+                    f"vertical leftabove split {theirs_file} | set readonly",
+                    "diffthis",
+                    "set winhighlight=DiffAdd:DiffAddGreen,DiffChange:DiffChangeNone,DiffText:DiffTextGreen,DiffDelete:DiffDeleteRed",
+                    
+                    "wincmd l",
+                    "diffthis",
+                    "set winhighlight=DiffAdd:DiffAddRed,DiffChange:DiffChangeNone,DiffText:DiffTextRed,DiffDelete:DiffDeleteGreen",
+                    
+                    f"vertical rightbelow split {ours_file} | set readonly",
+                    "diffthis",
+                    "set winhighlight=DiffAdd:DiffAddGreen,DiffChange:DiffChangeNone,DiffText:DiffTextGreen,DiffDelete:DiffDeleteRed",
+                    
+                    "wincmd j"
+                ]
+                vim_script.write_text("\n".join(script_content))
+                
+                # Open result file and source the layout script
                 cmd.append(str(result_file))
-                cmd.extend([
-                    "-c", f"topleft split {base_file} | set readonly",
-                    "-c", f"vertical leftabove split {theirs_file} | set readonly",
-                    "-c", "wincmd l",  # Move back to Base
-                    "-c", f"vertical rightbelow split {ours_file} | set readonly",
-                    "-c", "wincmd j",  # Move down to Result
-                ])
+                cmd.extend(["-S", str(vim_script)])
             else:
                 # Fallback for vim/vi: Open in tabs
                 cmd.extend(["-p", str(result_file), str(theirs_file), str(base_file), str(ours_file)])
