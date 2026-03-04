@@ -9,3 +9,4 @@ venv/
 *.egg-info/
 
 chezmoi-merge-assistant-example
+chezmerge-example
