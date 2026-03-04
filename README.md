@@ -64,15 +64,24 @@ cd $(chezmoi source-path)
 ```
 
 ### 2. Run Chezmerge
-Point the tool to the upstream repository you want to sync with.
-*Example:*
+Chezmerge has two phases:
+
+**First run (initialize workspace):**
 ```bash
 chezmerge --repo https://github.com/mylinuxforwork/dotfiles.git --inner-path dotfiles
 ```
- **Common Options:**
-* `--inner-path <path>`: If the dotfiles aren't at the repo root (e.g., `--inner-path dotfiles`).
-* `--branch <name>`: Sync with a specific branch (defaults to the remote's default branch).
-* `--dry-run`: Simulate the process without changing any files.
+
+**Subsequent runs (fetch + merge upstream updates):**
+```bash
+chezmerge --inner-path dotfiles
+```
+
+> [!NOTE]
+> `--repo` is only required on first run when `.chezmerge-upstream` does not exist yet.
+
+**Common Options:**
+* `--inner-path <path>`: Use this when dotfiles are in a subdirectory of the upstream repo (for ML4W, use `--inner-path dotfiles`).
+* `--dry-run`: Simulate merge logic without writing files or committing.
 
 ### 3. The Merge Process
 1.  **Analysis:** Chezmerge fetches upstream changes into `.chezmerge-upstream` and compares them to your local files.
