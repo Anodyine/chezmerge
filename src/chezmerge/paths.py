@@ -39,12 +39,18 @@ def normalize_path(path_str: str) -> str:
         new_parts.append(p)
     return str(Path(*new_parts))
 
-def chezmoify_path(path_str: str, executable: bool = False) -> str:
+def chezmoify_path(
+    path_str: str,
+    executable: bool = False,
+    private: bool = False,
+    readonly: bool = False,
+    symlink: bool = False,
+) -> str:
     """
     Converts a standard path (e.g. '.config/foo') to a basic chezmoi source path 
     (e.g. 'dot_config/foo').
-    If executable is True, applies the executable_ attribute prefix
-    to the final path component.
+    Attribute prefixes are applied to the final path component in this order:
+    private_ -> readonly_ -> executable_ -> symlink_.
     """
     parts = Path(path_str).parts
     new_parts = []
@@ -54,10 +60,18 @@ def chezmoify_path(path_str: str, executable: bool = False) -> str:
         else:
             mapped = part
 
-        if executable and index == len(parts) - 1:
-            # Avoid double-prefixing when source is already chezmoified.
-            if not any(mapped.startswith(prefix) for prefix in CHEZMOI_PREFIXES):
+        if index == len(parts) - 1:
+            # Avoid applying duplicate prefixes if source was already chezmoified.
+            has_prefix = lambda p: mapped.startswith(p)
+            # Prepending in reverse produces the canonical left-to-right order.
+            if symlink and not has_prefix("symlink_"):
+                mapped = "symlink_" + mapped
+            if executable and not has_prefix("executable_"):
                 mapped = "executable_" + mapped
+            if readonly and not has_prefix("readonly_"):
+                mapped = "readonly_" + mapped
+            if private and not has_prefix("private_"):
+                mapped = "private_" + mapped
 
         new_parts.append(mapped)
     return str(Path(*new_parts))
