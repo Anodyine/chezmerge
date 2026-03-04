@@ -78,9 +78,9 @@ chezmerge --repo https://github.com/mylinuxforwork/dotfiles.git --inner-path dot
 1.  **Analysis:** Chezmerge fetches upstream changes into `.chezmerge-upstream` and compares them to your local files.
 2.  **Auto-Merge:** Files you haven't touched are updated automatically.
 3.  **Conflict Resolution:** If both you and upstream changed a file, the TUI opens.
-4.  **Finalize:** Once all conflicts are resolved, Chezmerge stages the changes. You simply need to commit them:
+4.  **Finalize:** Once all conflicts are resolved, Chezmerge stages merged files, advances the `.chezmerge-upstream` submodule pointer, and auto-commits with:
 ```bash
-git commit -m "chore: sync with upstream via chezmerge"
+chore(chezmerge): Merge upstream changes
 ```
 ## 🧠 How It Works
 
