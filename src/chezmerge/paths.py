@@ -39,19 +39,27 @@ def normalize_path(path_str: str) -> str:
         new_parts.append(p)
     return str(Path(*new_parts))
 
-def chezmoify_path(path_str: str) -> str:
+def chezmoify_path(path_str: str, executable: bool = False) -> str:
     """
     Converts a standard path (e.g. '.config/foo') to a basic chezmoi source path 
     (e.g. 'dot_config/foo').
-    Note: This is a basic implementation for the MVP import process.
+    If executable is True, applies the executable_ attribute prefix
+    to the final path component.
     """
     parts = Path(path_str).parts
     new_parts = []
-    for part in parts:
+    for index, part in enumerate(parts):
         if part.startswith("."):
-            new_parts.append("dot_" + part[1:])
+            mapped = "dot_" + part[1:]
         else:
-            new_parts.append(part)
+            mapped = part
+
+        if executable and index == len(parts) - 1:
+            # Avoid double-prefixing when source is already chezmoified.
+            if not any(mapped.startswith(prefix) for prefix in CHEZMOI_PREFIXES):
+                mapped = "executable_" + mapped
+
+        new_parts.append(mapped)
     return str(Path(*new_parts))
 
 def find_local_match(repo_root: Path, target_rel_path: str) -> Optional[Path]:

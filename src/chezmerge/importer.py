@@ -19,9 +19,11 @@ def import_upstream(source_dir: Path, target_dir: Path, inner_path: str = ""):
         if item.is_file() and ".git" not in item.parts:
             # Get path relative to the root (e.g. .config/nvim/init.vim)
             rel_path = item.relative_to(root)
-            
-            # Convert to chezmoi path (e.g. dot_config/nvim/init.vim)
-            chez_path = chezmoify_path(str(rel_path))
+
+            # Convert to chezmoi path (e.g. dot_config/nvim/init.vim).
+            # Preserve executable intent as chezmoi metadata via executable_ prefix.
+            is_executable = bool(item.stat().st_mode & 0o111)
+            chez_path = chezmoify_path(str(rel_path), executable=is_executable)
             
             # Check if a template version already exists locally
             # If so, we skip importing the raw file to avoid ambiguity
