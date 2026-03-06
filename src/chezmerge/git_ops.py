@@ -31,17 +31,62 @@ class GitHandler:
         """Checks if the upstream submodule is initialized."""
         return (self.upstream_path / ".git").exists()
 
+    def is_submodule_registered(self) -> bool:
+        """Checks if the upstream submodule is tracked by the parent repository."""
+        rel_path = str(self.upstream_path.relative_to(self.repo_path))
+        result = subprocess.run(
+            ["git", "submodule", "status", "--", rel_path],
+            cwd=self.repo_path,
+            capture_output=True,
+            text=True
+        )
+        return result.returncode == 0 and bool(result.stdout.strip())
+
+    def get_configured_upstream_url(self) -> Optional[str]:
+        """Reads the upstream URL for this submodule from .gitmodules if present."""
+        gitmodules = self.repo_path / ".gitmodules"
+        if not gitmodules.exists():
+            return None
+
+        rel_path = str(self.upstream_path.relative_to(self.repo_path))
+        try:
+            paths_output = self.run_git(
+                ["config", "-f", ".gitmodules", "--get-regexp", r"^submodule\..*\.path$"],
+                cwd=self.repo_path,
+                strip=False
+            )
+        except subprocess.CalledProcessError:
+            return None
+
+        for line in paths_output.splitlines():
+            if not line.strip():
+                continue
+            key, _, value = line.partition(" ")
+            if value.strip() != rel_path:
+                continue
+            url_key = f"{key.rsplit('.path', 1)[0]}.url"
+            try:
+                url = self.run_git(["config", "-f", ".gitmodules", "--get", url_key], cwd=self.repo_path)
+            except subprocess.CalledProcessError:
+                return None
+            return url.strip() or None
+
+        return None
+
     def init_workspace(self, remote_url: str):
         """Sets up the .chezmerge-upstream submodule."""
         # Ensure main repo is initialized
         if not (self.repo_path / ".git").exists():
             self.run_git(["init"])
-        
-        print(f"Adding submodule {remote_url}...")
         rel_path = str(self.upstream_path.relative_to(self.repo_path))
-        
-        # Use -c protocol.file.allow=always to bypass security restriction for local paths during clone
-        self.run_git(["-c", "protocol.file.allow=always", "submodule", "add", remote_url, rel_path])
+
+        if self.is_submodule_registered():
+            print(f"Initializing existing submodule at {rel_path}...")
+            self.run_git(["-c", "protocol.file.allow=always", "submodule", "update", "--init", rel_path])
+        else:
+            print(f"Adding submodule {remote_url}...")
+            # Use -c protocol.file.allow=always to bypass security restriction for local paths during clone
+            self.run_git(["-c", "protocol.file.allow=always", "submodule", "add", remote_url, rel_path])
 
         # Configure the submodule to allow file protocol for future fetches
         self.run_git(["config", "protocol.file.allow", "always"], cwd=self.upstream_path)

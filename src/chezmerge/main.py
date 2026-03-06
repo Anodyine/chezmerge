@@ -63,12 +63,16 @@ def run():
     
     # 1. Initialization Phase
     if not git.is_initialized():
-        if not args.repo:
-            print("Error: First run requires --repo <url>")
+        repo_url = args.repo or git.get_configured_upstream_url()
+        if not repo_url:
+            print("Error: First run requires --repo <url> (or a .gitmodules entry for .chezmerge-upstream)")
             sys.exit(1)
-            
+
+        if not args.repo:
+            print(f"Using submodule URL from .gitmodules: {repo_url}")
+
         print("Initializing Chezmerge Workspace...")
-        git.init_workspace(args.repo)
+        git.init_workspace(repo_url)
         
         print("Performing initial import...")
         # Import from the submodule
