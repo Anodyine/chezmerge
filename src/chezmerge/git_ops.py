@@ -117,18 +117,36 @@ class GitHandler:
         except subprocess.CalledProcessError:
             return ""
 
-    def get_upstream_changes(self, inner_path: str = "") -> list[str]:
+    def get_upstream_changes(self, inner_path: str = "") -> list[tuple[str, str]]:
         """
-        Compares submodule HEAD and origin/HEAD and returns changed filenames.
+        Compares submodule HEAD and origin/HEAD and returns (status, path) pairs.
         """
         try:
-            output = self.run_git(["diff", "--name-only", "HEAD", "origin/HEAD"], cwd=self.upstream_path)
-            files = [line.strip() for line in output.splitlines() if line.strip()]
-            
+            output = self.run_git(["diff", "--name-status", "HEAD", "origin/HEAD"], cwd=self.upstream_path)
+            changes: list[tuple[str, str]] = []
+            for line in output.splitlines():
+                if not line.strip():
+                    continue
+                parts = line.split("\t")
+                status = parts[0].strip()
+                if not status:
+                    continue
+
+                # For rename/copy, use destination path (the last path field).
+                if len(parts) >= 3 and status[0] in ("R", "C"):
+                    path = parts[-1].strip()
+                elif len(parts) >= 2:
+                    path = parts[1].strip()
+                else:
+                    continue
+
+                if path:
+                    changes.append((status[0], path))
+
             if inner_path:
-                filtered = [f for f in files if f.startswith(inner_path)]
+                filtered = [(status, path) for status, path in changes if path.startswith(inner_path)]
                 return filtered
-            return files
+            return changes
         except subprocess.CalledProcessError:
             return []
 

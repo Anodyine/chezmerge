@@ -63,6 +63,7 @@ def run():
     
     # 1. Initialization Phase
     if not git.is_initialized():
+        submodule_was_registered = git.is_submodule_registered()
         repo_url = args.repo or git.get_configured_upstream_url()
         if not repo_url:
             print("Error: First run requires --repo <url> (or a .gitmodules entry for .chezmerge-upstream)")
@@ -73,13 +74,17 @@ def run():
 
         print("Initializing Chezmerge Workspace...")
         git.init_workspace(repo_url)
-        
-        print("Performing initial import...")
-        # Import from the submodule
-        import_upstream(git.upstream_path, local_path, args.inner_path)
-        
-        print("Initialization complete. You can now run 'chezmoi apply'.")
-        return
+
+        # If the submodule already existed in .gitmodules but was not initialized,
+        # this is not a true first run. Continue to update/merge flow to preserve
+        # local modifications and present conflicts as needed.
+        if not submodule_was_registered:
+            print("Performing initial import...")
+            # Import from the submodule
+            import_upstream(git.upstream_path, local_path, args.inner_path)
+
+            print("Initialization complete. You can now run 'chezmoi apply'.")
+            return
 
     # 2. Update Phase
     print("Fetching upstream changes...")
@@ -97,7 +102,9 @@ def run():
     merge_items = []
     engine = DecisionEngine()
     
-    for upstream_file in changed_files:
+    deletion_conflicts: list[str] = []
+
+    for change_type, upstream_file in changed_files:
         # upstream_file is relative to repo root (e.g. 'dots/.bashrc')
         # We need the path relative to the inner_path for matching
         rel_target_path = upstream_file
@@ -109,6 +116,26 @@ def run():
         
         if not local_file:
             print(f"Skipping {rel_target_path} (not found locally)")
+            continue
+
+        if change_type == "D":
+            base_content = git.get_file_content("base", upstream_file)
+            raw_local_content = git.get_file_content("local", str(local_file))
+
+            # Safe auto-delete only when local content still matches base.
+            if raw_local_content == base_content:
+                if args.dry_run:
+                    print(f"  - {str(local_file)} [AUTO_DELETE]")
+                else:
+                    print(f"Auto-deleting {rel_target_path} (upstream deleted, local unchanged)...")
+                    dest = local_path / str(local_file)
+                    if dest.exists():
+                        dest.unlink()
+                    git.stage_file(str(local_file))
+                continue
+
+            print(f"Deletion conflict: {rel_target_path} (upstream deleted, local file modified)")
+            deletion_conflicts.append(str(local_file))
             continue
 
         # Gather 4-way state
@@ -172,6 +199,13 @@ def run():
             template=template_state,
             scenario=scenario
         ))
+
+    if deletion_conflicts:
+        print(f"{len(deletion_conflicts)} deletion conflict(s) require manual resolution:")
+        for path in deletion_conflicts:
+            print(f"  - {path}")
+        print("Aborting without commit so you can resolve these files manually.")
+        return
 
     if not merge_items:
         print("All changes merged automatically.")
