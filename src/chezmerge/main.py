@@ -60,7 +60,6 @@ def run():
         local_path.mkdir(parents=True, exist_ok=True)
 
     git = GitHandler(local_path)
-    git.ensure_apply_hook()
     
     # 1. Initialization Phase
     if not git.is_initialized():
@@ -75,6 +74,7 @@ def run():
 
         print("Initializing Chezmerge Workspace...")
         git.init_workspace(repo_url)
+        git.ensure_pull_hooks()
 
         # If the submodule already existed in .gitmodules but was not initialized,
         # this is not a true first run. Continue to update/merge flow to preserve
@@ -86,6 +86,8 @@ def run():
 
             print("Initialization complete. You can now run 'chezmoi apply'.")
             return
+    else:
+        git.ensure_pull_hooks()
 
     # 2. Update Phase
     print("Fetching upstream changes...")

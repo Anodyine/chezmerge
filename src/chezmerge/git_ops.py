@@ -5,46 +5,73 @@ from pathlib import Path
 from typing import Optional
 
 class GitHandler:
-    APPLY_HOOK_FILENAME = "run_after_15-chezmerge-sync-submodule.sh.tmpl"
-    APPLY_HOOK_MARKER = "# Managed by chezmerge: submodule sync hook"
+    PULL_HOOKS_DIR = ".githooks"
+    PULL_HOOK_NAMES = ("post-merge", "post-rewrite")
+    PULL_HOOK_MARKER = "# Managed by chezmerge: pull submodule sync hook"
 
-    APPLY_HOOK_CONTENT = """#!/usr/bin/env bash
+    PULL_HOOK_CONTENT = """#!/usr/bin/env bash
 set -euo pipefail
 
-# Managed by chezmerge: submodule sync hook
-# Keeps the local submodule worktree aligned with the commit recorded
-# in the parent repository after you pull changes from another machine.
-git -C "{{ .chezmoi.sourceDir }}" submodule update --init --recursive .chezmerge-upstream || true
+# Managed by chezmerge: pull submodule sync hook
+# Keep the local submodule worktree aligned with the commit recorded
+# in the parent repository after pull/merge/rebase operations.
+git submodule update --init --recursive .chezmerge-upstream || true
 """
 
     def __init__(self, repo_path: Path):
         self.repo_path = repo_path.resolve()
         self.upstream_path = self.repo_path / ".chezmerge-upstream"
 
-    def ensure_apply_hook(self):
+    def ensure_pull_hooks(self):
         """
-        Ensures a minimal chezmoi apply hook exists to keep the submodule aligned.
-        If a non-chezmerge file exists at that path, it is left untouched.
+        Ensures git pull-related hooks exist and local core.hooksPath points to them.
+        If a non-chezmerge hook exists at a managed path, it is left untouched.
         """
-        hook_path = self.repo_path / self.APPLY_HOOK_FILENAME
-        desired = self.APPLY_HOOK_CONTENT
+        if not (self.repo_path / ".git").exists():
+            return
+
+        hooks_dir = self.repo_path / self.PULL_HOOKS_DIR
+        hooks_dir.mkdir(parents=True, exist_ok=True)
+
+        for hook_name in self.PULL_HOOK_NAMES:
+            hook_path = hooks_dir / hook_name
+            self._ensure_managed_hook(hook_path, hook_name)
+
+        self._ensure_hooks_path_config()
+
+    def _ensure_managed_hook(self, hook_path: Path, hook_name: str):
+        desired = self.PULL_HOOK_CONTENT
 
         if hook_path.exists():
             current = hook_path.read_text(encoding="utf-8", errors="surrogateescape")
-            if self.APPLY_HOOK_MARKER not in current:
+            if self.PULL_HOOK_MARKER not in current:
                 print(
-                    f"Warning: {self.APPLY_HOOK_FILENAME} exists and is not managed by chezmerge; "
+                    f"Warning: {self.PULL_HOOKS_DIR}/{hook_name} exists and is not managed by chezmerge; "
                     "leaving it unchanged."
                 )
                 return
-            if current == desired:
-                return
+            if current != desired:
+                hook_path.write_text(desired, encoding="utf-8", errors="surrogateescape")
+                print(f"Updated {self.PULL_HOOKS_DIR}/{hook_name}")
+        else:
             hook_path.write_text(desired, encoding="utf-8", errors="surrogateescape")
-            print(f"Updated {self.APPLY_HOOK_FILENAME}")
+            print(f"Installed {self.PULL_HOOKS_DIR}/{hook_name}")
+
+        hook_path.chmod(0o755)
+
+    def _ensure_hooks_path_config(self):
+        result = subprocess.run(
+            ["git", "config", "--local", "--get", "core.hooksPath"],
+            cwd=self.repo_path,
+            capture_output=True,
+            text=True
+        )
+        current = result.stdout.strip() if result.returncode == 0 else ""
+        if current == self.PULL_HOOKS_DIR:
             return
 
-        hook_path.write_text(desired, encoding="utf-8", errors="surrogateescape")
-        print(f"Installed {self.APPLY_HOOK_FILENAME}")
+        self.run_git(["config", "--local", "core.hooksPath", self.PULL_HOOKS_DIR])
+        print(f"Configured core.hooksPath={self.PULL_HOOKS_DIR}")
 
     def run_git(self, args: list[str], cwd: Optional[Path] = None, strip: bool = True, text: bool = True):
         """Executes a git command."""
