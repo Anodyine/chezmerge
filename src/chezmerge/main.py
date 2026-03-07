@@ -6,7 +6,7 @@ from pathlib import Path
 
 from .logic import MergeItem, FileState, MergeScenario, DecisionEngine
 from .git_ops import GitHandler
-from .paths import find_local_match, normalize_path
+from .paths import find_local_match, chezmoify_path
 from .importer import import_upstream
 
 def parse_args():
@@ -103,19 +103,45 @@ def run():
     engine = DecisionEngine()
     
     deletion_conflicts: list[str] = []
+    unresolved_missing: list[str] = []
 
     for change_type, upstream_file in changed_files:
         # upstream_file is relative to repo root (e.g. 'dots/.bashrc')
         # We need the path relative to the inner_path for matching
         rel_target_path = upstream_file
-        if args.inner_path and upstream_file.startswith(args.inner_path):
-            rel_target_path = upstream_file[len(args.inner_path):].lstrip("/")
+        if args.inner_path:
+            normalized_inner = args.inner_path.strip("/")
+            prefix = f"{normalized_inner}/"
+            if upstream_file.startswith(prefix):
+                rel_target_path = upstream_file[len(prefix):]
+            elif upstream_file == normalized_inner:
+                rel_target_path = ""
             
         # Find local match
         local_file = find_local_match(local_path, rel_target_path)
         
         if not local_file:
-            print(f"Skipping {rel_target_path} (not found locally)")
+            if change_type == "A":
+                mode = git.get_file_mode("origin/HEAD", upstream_file)
+                is_symlink = mode == "120000"
+                is_executable = mode == "100755"
+                dest_rel = chezmoify_path(rel_target_path, executable=is_executable, symlink=is_symlink)
+                content = git.get_file_content("latest", upstream_file)
+                if is_symlink and content and not content.endswith("\n"):
+                    # chezmoi stores symlink targets as file content with trailing newline.
+                    content = f"{content}\n"
+
+                if args.dry_run:
+                    print(f"  - {dest_rel} [AUTO_IMPORT]")
+                else:
+                    print(f"Auto-importing new upstream file {rel_target_path}...")
+                    git.write_local_file(dest_rel, content)
+                    git.stage_file(dest_rel)
+                continue
+
+            unresolved = rel_target_path or upstream_file
+            print(f"Missing local counterpart for {unresolved} ({change_type}); manual resolution required.")
+            unresolved_missing.append(unresolved)
             continue
 
         if change_type == "D":
@@ -179,15 +205,14 @@ def run():
                 print(f"  - {str(local_file)} [{scenario.name}]")
             else:
                 print(f"Auto-merging {rel_target_path} ({scenario.name})...")
-                dest = local_path / str(local_file)
-                # For AUTO_UPDATE, theirs_content is the target. 
+                # For AUTO_UPDATE, theirs_content is the target.
                 # For AUTO_MERGEABLE, merged_content is the target.
                 content_to_write = merged_content if scenario == MergeScenario.AUTO_MERGEABLE else theirs_content
                 
                 if content_to_write is None:
                     raise RuntimeError(f"Unexpected None content for {scenario.name}")
 
-                dest.write_text(content_to_write)
+                git.write_local_file(str(local_file), content_to_write)
                 git.stage_file(str(local_file))
             continue
 
@@ -205,6 +230,13 @@ def run():
         for path in deletion_conflicts:
             print(f"  - {path}")
         print("Aborting without commit so you can resolve these files manually.")
+        return
+
+    if unresolved_missing:
+        print(f"{len(unresolved_missing)} path(s) require manual resolution before advancing base pointer:")
+        for path in unresolved_missing:
+            print(f"  - {path}")
+        print("Aborting without commit to avoid dropping upstream changes.")
         return
 
     if not merge_items:
@@ -231,8 +263,7 @@ def run():
         print("Applying changes to local files...")
         for item in results:
             # Write the template content back to the local file
-            dest = local_path / item.path
-            dest.write_text(item.template.content)
+            git.write_local_file(item.path, item.template.content)
             git.stage_file(item.path)
             print(f"Updated {item.path}")
         

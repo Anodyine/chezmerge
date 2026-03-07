@@ -9,7 +9,7 @@ class GitHandler:
         self.repo_path = repo_path.resolve()
         self.upstream_path = self.repo_path / ".chezmerge-upstream"
 
-    def run_git(self, args: list[str], cwd: Optional[Path] = None, strip: bool = True) -> str:
+    def run_git(self, args: list[str], cwd: Optional[Path] = None, strip: bool = True, text: bool = True):
         """Executes a git command."""
         target_cwd = cwd if cwd else self.repo_path
         try:
@@ -17,10 +17,13 @@ class GitHandler:
                 ["git"] + args, 
                 cwd=target_cwd, 
                 capture_output=True, 
-                text=True, 
+                text=text, 
                 check=True
             )
-            return result.stdout.strip() if strip else result.stdout
+            stdout = result.stdout
+            if text:
+                return stdout.strip() if strip else stdout
+            return stdout
         except subprocess.CalledProcessError as e:
             print(f"Git command failed: git {' '.join(args)}")
             print(f"CWD: {target_cwd}")
@@ -106,16 +109,31 @@ class GitHandler:
         """
         if source == 'local':
             p = self.repo_path / path
-            return p.read_text() if p.exists() else ""
+            return p.read_bytes().decode("utf-8", errors="surrogateescape") if p.exists() else ""
         
         # For base/latest, read from the submodule
         # 'base' is the currently checked out commit in the submodule
         # 'latest' is the remote HEAD
         ref = "HEAD" if source == "base" else "origin/HEAD"
         try:
-            return self.run_git(["show", f"{ref}:{path}"], cwd=self.upstream_path, strip=False)
+            raw = self.run_git(["show", f"{ref}:{path}"], cwd=self.upstream_path, strip=False, text=False)
+            return raw.decode("utf-8", errors="surrogateescape")
         except subprocess.CalledProcessError:
             return ""
+
+    def get_file_mode(self, ref: str, path: str) -> Optional[str]:
+        """Gets the git mode for a file at ref:path (e.g. 100644, 100755, 120000)."""
+        try:
+            output = self.run_git(["ls-tree", ref, "--", path], cwd=self.upstream_path, strip=True)
+        except subprocess.CalledProcessError:
+            return None
+
+        if not output:
+            return None
+
+        # Format: "<mode> <type> <sha>\t<path>"
+        first_field = output.split()[0] if output.split() else ""
+        return first_field or None
 
     def get_upstream_changes(self, inner_path: str = "") -> list[tuple[str, str]]:
         """
@@ -144,11 +162,23 @@ class GitHandler:
                     changes.append((status[0], path))
 
             if inner_path:
-                filtered = [(status, path) for status, path in changes if path.startswith(inner_path)]
+                normalized_inner = inner_path.strip("/")
+                prefix = f"{normalized_inner}/"
+                filtered = [
+                    (status, path)
+                    for status, path in changes
+                    if path == normalized_inner or path.startswith(prefix)
+                ]
                 return filtered
             return changes
         except subprocess.CalledProcessError:
             return []
+
+    def write_local_file(self, path: str, content: str):
+        """Writes file content preserving non-UTF8 bytes via surrogateescape."""
+        target = self.repo_path / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content.encode("utf-8", errors="surrogateescape"))
 
     def update_base_pointer(self):
         """Updates the submodule to match origin/HEAD and stages it in the main repo."""
@@ -171,13 +201,13 @@ class GitHandler:
         Attempts a 3-way merge using 'git merge-file'.
         Returns (success, merged_content).
         """
-        with tempfile.NamedTemporaryFile(mode='w+', delete=True) as f_base, \
-             tempfile.NamedTemporaryFile(mode='w+', delete=True) as f_ours, \
-             tempfile.NamedTemporaryFile(mode='w+', delete=True) as f_theirs:
+        with tempfile.NamedTemporaryFile(mode='wb+', delete=True) as f_base, \
+             tempfile.NamedTemporaryFile(mode='wb+', delete=True) as f_ours, \
+             tempfile.NamedTemporaryFile(mode='wb+', delete=True) as f_theirs:
             
-            f_base.write(base)
-            f_ours.write(ours)
-            f_theirs.write(theirs)
+            f_base.write(base.encode("utf-8", errors="surrogateescape"))
+            f_ours.write(ours.encode("utf-8", errors="surrogateescape"))
+            f_theirs.write(theirs.encode("utf-8", errors="surrogateescape"))
             
             f_base.flush()
             f_ours.flush()
@@ -187,8 +217,7 @@ class GitHandler:
             # -p sends result to stdout, returns 0 on success, positive on conflict
             res = subprocess.run(
                 ["git", "merge-file", "-p", f_ours.name, f_base.name, f_theirs.name],
-                capture_output=True,
-                text=True
+                capture_output=True
             )
             
-            return (res.returncode == 0, res.stdout)
+            return (res.returncode == 0, res.stdout.decode("utf-8", errors="surrogateescape"))
