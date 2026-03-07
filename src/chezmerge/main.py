@@ -60,6 +60,7 @@ def run():
         local_path.mkdir(parents=True, exist_ok=True)
 
     git = GitHandler(local_path)
+    git.ensure_apply_hook()
     
     # 1. Initialization Phase
     if not git.is_initialized():

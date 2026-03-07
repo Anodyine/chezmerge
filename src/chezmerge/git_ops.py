@@ -5,9 +5,46 @@ from pathlib import Path
 from typing import Optional
 
 class GitHandler:
+    APPLY_HOOK_FILENAME = "run_after_15-chezmerge-sync-submodule.sh.tmpl"
+    APPLY_HOOK_MARKER = "# Managed by chezmerge: submodule sync hook"
+
+    APPLY_HOOK_CONTENT = """#!/usr/bin/env bash
+set -euo pipefail
+
+# Managed by chezmerge: submodule sync hook
+# Keeps the local submodule worktree aligned with the commit recorded
+# in the parent repository after you pull changes from another machine.
+git -C "{{ .chezmoi.sourceDir }}" submodule update --init --recursive .chezmerge-upstream || true
+"""
+
     def __init__(self, repo_path: Path):
         self.repo_path = repo_path.resolve()
         self.upstream_path = self.repo_path / ".chezmerge-upstream"
+
+    def ensure_apply_hook(self):
+        """
+        Ensures a minimal chezmoi apply hook exists to keep the submodule aligned.
+        If a non-chezmerge file exists at that path, it is left untouched.
+        """
+        hook_path = self.repo_path / self.APPLY_HOOK_FILENAME
+        desired = self.APPLY_HOOK_CONTENT
+
+        if hook_path.exists():
+            current = hook_path.read_text(encoding="utf-8", errors="surrogateescape")
+            if self.APPLY_HOOK_MARKER not in current:
+                print(
+                    f"Warning: {self.APPLY_HOOK_FILENAME} exists and is not managed by chezmerge; "
+                    "leaving it unchanged."
+                )
+                return
+            if current == desired:
+                return
+            hook_path.write_text(desired, encoding="utf-8", errors="surrogateescape")
+            print(f"Updated {self.APPLY_HOOK_FILENAME}")
+            return
+
+        hook_path.write_text(desired, encoding="utf-8", errors="surrogateescape")
+        print(f"Installed {self.APPLY_HOOK_FILENAME}")
 
     def run_git(self, args: list[str], cwd: Optional[Path] = None, strip: bool = True, text: bool = True):
         """Executes a git command."""
