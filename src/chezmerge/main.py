@@ -3,6 +3,7 @@ import argparse
 import subprocess
 import os
 from pathlib import Path
+from typing import Optional
 
 from .logic import MergeItem, FileState, MergeScenario, DecisionEngine
 from .git_ops import GitHandler
@@ -50,6 +51,22 @@ def render_chezmoi_template(content: str) -> str:
     except FileNotFoundError:
         print("Warning: 'chezmoi' executable not found. Cannot render template.", file=sys.stderr)
         return content
+
+def import_new_upstream_file(git: GitHandler, rel_target_path: str, upstream_file: str) -> Optional[str]:
+    """Imports a newly-added upstream file and returns the staged local relative path."""
+    mode = git.get_file_mode("origin/HEAD", upstream_file)
+    is_symlink = mode == "120000"
+    is_executable = mode == "100755"
+    dest_rel = chezmoify_path(rel_target_path, executable=is_executable, symlink=is_symlink)
+
+    content = git.get_file_content("latest", upstream_file)
+    if is_symlink and content and not content.endswith("\n"):
+        # chezmoi stores symlink targets as file content with trailing newline.
+        content = f"{content}\n"
+
+    git.write_local_file(dest_rel, content)
+    git.stage_file(dest_rel)
+    return dest_rel
 
 def run():
     args = parse_args()
@@ -125,21 +142,15 @@ def run():
         
         if not local_file:
             if change_type == "A":
-                mode = git.get_file_mode("origin/HEAD", upstream_file)
-                is_symlink = mode == "120000"
-                is_executable = mode == "100755"
-                dest_rel = chezmoify_path(rel_target_path, executable=is_executable, symlink=is_symlink)
-                content = git.get_file_content("latest", upstream_file)
-                if is_symlink and content and not content.endswith("\n"):
-                    # chezmoi stores symlink targets as file content with trailing newline.
-                    content = f"{content}\n"
-
                 if args.dry_run:
+                    mode = git.get_file_mode("origin/HEAD", upstream_file)
+                    is_symlink = mode == "120000"
+                    is_executable = mode == "100755"
+                    dest_rel = chezmoify_path(rel_target_path, executable=is_executable, symlink=is_symlink)
                     print(f"  - {dest_rel} [AUTO_IMPORT]")
                 else:
-                    print(f"Auto-importing new upstream file {rel_target_path}...")
-                    git.write_local_file(dest_rel, content)
-                    git.stage_file(dest_rel)
+                    staged_path = import_new_upstream_file(git, rel_target_path, upstream_file)
+                    print(f"Auto-importing new upstream file {rel_target_path} -> {staged_path}")
                 continue
 
             unresolved = rel_target_path or upstream_file
