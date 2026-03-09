@@ -199,13 +199,34 @@ git submodule update --init --recursive .chezmerge-upstream || true
         first_field = output.split()[0] if output.split() else ""
         return first_field or None
 
-    def get_upstream_changes(self, inner_path: str = "") -> list[tuple[str, str]]:
+    def is_path_tracked(self, path: str) -> bool:
+        """Returns True when path exists in git index/history for this repo."""
+        result = subprocess.run(
+            ["git", "ls-files", "--error-unmatch", "--", path],
+            cwd=self.repo_path,
+            capture_output=True,
+            text=True
+        )
+        return result.returncode == 0
+
+    def get_upstream_changes(self, inner_path: str = "") -> list[tuple[str, str, Optional[str]]]:
         """
-        Compares submodule HEAD and origin/HEAD and returns (status, path) pairs.
+        Compares submodule HEAD and origin/HEAD and returns:
+        (status, path, source_path)
+
+        For regular statuses (A/M/D), source_path is None.
+        For rename/copy statuses (R/C), path is destination and source_path is origin.
         """
+        def _in_scope(path: str, normalized_inner: str) -> bool:
+            if not normalized_inner:
+                return True
+            prefix = f"{normalized_inner}/"
+            return path == normalized_inner or path.startswith(prefix)
+
         try:
             output = self.run_git(["diff", "--name-status", "HEAD", "origin/HEAD"], cwd=self.upstream_path)
-            changes: list[tuple[str, str]] = []
+            changes: list[tuple[str, str, Optional[str]]] = []
+            normalized_inner = inner_path.strip("/")
             for line in output.splitlines():
                 if not line.strip():
                     continue
@@ -214,26 +235,24 @@ git submodule update --init --recursive .chezmerge-upstream || true
                 if not status:
                     continue
 
-                # For rename/copy, use destination path (the last path field).
-                if len(parts) >= 3 and status[0] in ("R", "C"):
-                    path = parts[-1].strip()
-                elif len(parts) >= 2:
-                    path = parts[1].strip()
-                else:
+                kind = status[0]
+                if kind in ("R", "C"):
+                    if len(parts) < 3:
+                        continue
+                    source_path = parts[1].strip()
+                    dest_path = parts[2].strip()
+                    if not source_path or not dest_path:
+                        continue
+                    if _in_scope(source_path, normalized_inner) or _in_scope(dest_path, normalized_inner):
+                        changes.append((kind, dest_path, source_path))
                     continue
 
-                if path:
-                    changes.append((status[0], path))
+                if len(parts) < 2:
+                    continue
+                path = parts[1].strip()
+                if path and _in_scope(path, normalized_inner):
+                    changes.append((kind, path, None))
 
-            if inner_path:
-                normalized_inner = inner_path.strip("/")
-                prefix = f"{normalized_inner}/"
-                filtered = [
-                    (status, path)
-                    for status, path in changes
-                    if path == normalized_inner or path.startswith(prefix)
-                ]
-                return filtered
             return changes
         except subprocess.CalledProcessError:
             return []
@@ -253,8 +272,8 @@ git submodule update --init --recursive .chezmerge-upstream || true
         self.run_git(["add", rel_path])
 
     def stage_file(self, path: str):
-        """Stages a file in the main repository."""
-        self.run_git(["add", path])
+        """Stages a file change in the main repository (add/update/delete)."""
+        self.run_git(["add", "-A", "--", path])
 
     def commit(self, message: str):
         """Commits staged changes."""

@@ -125,15 +125,147 @@ def run():
     deletion_conflicts: list[str] = []
     unresolved_missing: list[str] = []
 
-    for change_type, upstream_file in changed_files:
+    normalized_inner = args.inner_path.strip("/")
+    inner_prefix = f"{normalized_inner}/" if normalized_inner else ""
+
+    def to_inner_relative(upstream_path: str) -> Optional[str]:
+        if not normalized_inner:
+            return upstream_path
+        if upstream_path == normalized_inner:
+            return ""
+        if upstream_path.startswith(inner_prefix):
+            return upstream_path[len(inner_prefix):]
+        return None
+
+    for change_type, upstream_file, source_upstream_file in changed_files:
+        if change_type == "R":
+            old_upstream_file = source_upstream_file
+            new_upstream_file = upstream_file
+
+            if not old_upstream_file:
+                unresolved_missing.append(new_upstream_file)
+                print(f"Missing rename source metadata for {new_upstream_file}; manual resolution required.")
+                continue
+
+            rel_old_target = to_inner_relative(old_upstream_file)
+            rel_new_target = to_inner_relative(new_upstream_file)
+
+            local_old = find_local_match(local_path, rel_old_target) if rel_old_target is not None else None
+            local_new = find_local_match(local_path, rel_new_target) if rel_new_target is not None else None
+
+            # Rename moved out of managed scope -> treat as deletion.
+            if rel_old_target is not None and rel_new_target is None:
+                if not local_old:
+                    unresolved = rel_old_target or old_upstream_file
+                    print(f"Missing local counterpart for {unresolved} (R->out); manual resolution required.")
+                    unresolved_missing.append(unresolved)
+                    continue
+
+                base_content = git.get_file_content("base", old_upstream_file)
+                raw_local_content = git.get_file_content("local", str(local_old))
+                if raw_local_content == base_content:
+                    if args.dry_run:
+                        print(f"  - {str(local_old)} [AUTO_DELETE]")
+                    else:
+                        print(f"Auto-deleting {rel_old_target} (upstream renamed outside inner path)...")
+                        old_abs = local_path / str(local_old)
+                        if old_abs.exists():
+                            old_abs.unlink()
+                        if git.is_path_tracked(str(local_old)):
+                            git.stage_file(str(local_old))
+                    continue
+
+                print(f"Rename conflict: {rel_old_target} -> {new_upstream_file} (local file modified)")
+                unresolved_missing.append(f"{rel_old_target} -> {new_upstream_file}")
+                continue
+
+            # Rename moved into managed scope -> treat as addition.
+            if rel_old_target is None and rel_new_target is not None:
+                if local_new:
+                    latest_content = git.get_file_content("latest", new_upstream_file)
+                    raw_local_new = git.get_file_content("local", str(local_new))
+                    if raw_local_new == latest_content:
+                        continue
+                    unresolved = rel_new_target or new_upstream_file
+                    print(f"Existing local file for renamed upstream path {unresolved}; manual resolution required.")
+                    unresolved_missing.append(unresolved)
+                    continue
+
+                if args.dry_run:
+                    mode = git.get_file_mode("origin/HEAD", new_upstream_file)
+                    is_symlink = mode == "120000"
+                    is_executable = mode == "100755"
+                    dest_rel = chezmoify_path(rel_new_target, executable=is_executable, symlink=is_symlink)
+                    print(f"  - {dest_rel} [AUTO_IMPORT]")
+                else:
+                    staged_path = import_new_upstream_file(git, rel_new_target, new_upstream_file)
+                    print(f"Auto-importing renamed upstream file {new_upstream_file} -> {staged_path}")
+                continue
+
+            # Rename wholly outside scope should not appear, but ignore safely if it does.
+            if rel_old_target is None and rel_new_target is None:
+                continue
+
+            # Standard in-scope rename.
+            if not local_old:
+                unresolved = rel_old_target or old_upstream_file
+                print(f"Missing local counterpart for {unresolved} (R); manual resolution required.")
+                unresolved_missing.append(unresolved)
+                continue
+
+            base_old_content = git.get_file_content("base", old_upstream_file)
+            raw_local_old_content = git.get_file_content("local", str(local_old))
+            if raw_local_old_content != base_old_content:
+                old_display = rel_old_target or old_upstream_file
+                new_display = rel_new_target or new_upstream_file
+                print(f"Rename conflict: {old_display} -> {new_display} (local file modified)")
+                unresolved_missing.append(f"{old_display} -> {new_display}")
+                continue
+
+            mode = git.get_file_mode("origin/HEAD", new_upstream_file)
+            is_symlink = mode == "120000"
+            is_executable = mode == "100755"
+            new_local_rel = chezmoify_path(rel_new_target, executable=is_executable, symlink=is_symlink)
+            latest_new_content = git.get_file_content("latest", new_upstream_file)
+            if is_symlink and latest_new_content and not latest_new_content.endswith("\n"):
+                latest_new_content = f"{latest_new_content}\n"
+
+            old_local_rel = str(local_old)
+            old_abs = local_path / old_local_rel
+            new_abs = local_path / new_local_rel
+
+            if args.dry_run:
+                print(f"  - {old_local_rel} -> {new_local_rel} [AUTO_RENAME]")
+                continue
+
+            # If destination already exists with unexpected content, require manual handling.
+            if new_abs.exists() and new_abs != old_abs:
+                current_new_content = git.get_file_content("local", new_local_rel)
+                if current_new_content != latest_new_content:
+                    old_display = rel_old_target or old_upstream_file
+                    new_display = rel_new_target or new_upstream_file
+                    print(f"Rename conflict: destination exists for {old_display} -> {new_display}; manual resolution required.")
+                    unresolved_missing.append(f"{old_display} -> {new_display}")
+                    continue
+
+            print(f"Auto-renaming {rel_old_target} -> {rel_new_target}...")
+            if old_abs.exists() and new_abs != old_abs:
+                new_abs.parent.mkdir(parents=True, exist_ok=True)
+                old_abs.rename(new_abs)
+
+            git.write_local_file(new_local_rel, latest_new_content)
+            git.stage_file(new_local_rel)
+            if new_local_rel != old_local_rel:
+                if git.is_path_tracked(old_local_rel):
+                    git.stage_file(old_local_rel)
+            continue
+
         # upstream_file is relative to repo root (e.g. 'dots/.bashrc')
         # We need the path relative to the inner_path for matching
         rel_target_path = upstream_file
-        if args.inner_path:
-            normalized_inner = args.inner_path.strip("/")
-            prefix = f"{normalized_inner}/"
-            if upstream_file.startswith(prefix):
-                rel_target_path = upstream_file[len(prefix):]
+        if normalized_inner:
+            if upstream_file.startswith(inner_prefix):
+                rel_target_path = upstream_file[len(inner_prefix):]
             elif upstream_file == normalized_inner:
                 rel_target_path = ""
             
@@ -151,6 +283,11 @@ def run():
                 else:
                     staged_path = import_new_upstream_file(git, rel_target_path, upstream_file)
                     print(f"Auto-importing new upstream file {rel_target_path} -> {staged_path}")
+                continue
+            if change_type == "D":
+                # If upstream deleted a file and we no longer have a local source entry
+                # that maps to it, the desired state (absence) is already satisfied.
+                print(f"Skipping {rel_target_path} (upstream deleted, local counterpart already absent).")
                 continue
 
             unresolved = rel_target_path or upstream_file
@@ -171,7 +308,8 @@ def run():
                     dest = local_path / str(local_file)
                     if dest.exists():
                         dest.unlink()
-                    git.stage_file(str(local_file))
+                    if git.is_path_tracked(str(local_file)):
+                        git.stage_file(str(local_file))
                 continue
 
             print(f"Deletion conflict: {rel_target_path} (upstream deleted, local file modified)")
