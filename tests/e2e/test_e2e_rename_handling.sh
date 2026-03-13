@@ -23,7 +23,7 @@ echo "stable content" > dotfiles/.oldname
 echo "base content" > dotfiles/.modold
 git add .
 git commit -m "Initial commit with rename candidates"
-git push origin master
+git push origin HEAD
 cd "$PROJECT_ROOT"
 
 echo -e "${GREEN}=== Initializing Local ===${NC}"
@@ -40,7 +40,7 @@ cd "$MAINTAINER_DIR"
 git mv dotfiles/.oldname dotfiles/.newname
 git mv dotfiles/.modold dotfiles/.modnew
 git commit -m "Rename files upstream"
-git push origin master
+git push origin HEAD
 cd "$PROJECT_ROOT"
 
 echo -e "${GREEN}=== Running Update ===${NC}"

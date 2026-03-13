@@ -25,7 +25,7 @@ PY
 
 git add blob.bin
 git commit -m "Initial binary commit"
-git push origin master
+git push origin HEAD
 cd "$PROJECT_ROOT"
 
 echo -e "${GREEN}=== Initializing Local ===${NC}"
@@ -41,7 +41,7 @@ Path("blob.bin").write_bytes(bytes([0x10, 0x11, 0x12, 0xFF, 0x0A]))
 PY
 git add blob.bin
 git commit -m "Update binary"
-git push origin master
+git push origin HEAD
 cd "$PROJECT_ROOT"
 
 echo -e "${GREEN}=== Running Update ===${NC}"

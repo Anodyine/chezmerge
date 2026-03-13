@@ -21,7 +21,7 @@ cd "$MAINTAINER_DIR"
 echo "alias ll='ls -l'" > .bashrc
 git add .bashrc
 git commit -m "Initial commit"
-git push origin master
+git push origin HEAD
 cd "$PROJECT_ROOT"
 
 echo -e "${GREEN}=== Initializing Local ===${NC}"
@@ -34,7 +34,7 @@ cd "$MAINTAINER_DIR"
 echo "set number" > .vimrc
 git add .vimrc
 git commit -m "Add vimrc"
-git push origin master
+git push origin HEAD
 cd "$PROJECT_ROOT"
 
 echo -e "${GREEN}=== Running Update ===${NC}"

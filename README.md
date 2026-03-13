@@ -14,8 +14,8 @@ Keeping your dotfiles in sync with an upstream repository (like [ML4W](https://g
 ## ✨ Features
 
 * **Visual 3-Way Merge:** See exactly what changed across three panes (Theirs, Base, Ours).
-* **Template Awareness:** Understands `chezmoi` file naming conventions (`dot_`, `private_`, `executable_`).
-* **Smart Analysis:** Automatically detects safe updates versus complex conflicts.
+* **Template Awareness:** Understands `chezmoi` file naming conventions (`dot_`, `private_`, `executable_`) and maps templates to the same target path as upstream dotfiles.
+* **Smart Analysis:** Automatically detects safe updates versus complex conflicts, including non-overlapping changes inside template source files.
 * **External Editor Integration:** * Seamlessly open the current merge in **Neovim**, **Vim**, or **Vi**.
     * **Neovim Special:** Launches a custom 4-pane split layout designed specifically for merging.
 * **Safety First:** Operates on git objects and a local submodule in `.chezmerge-upstream`. Your actual source files are only updated once you explicitly save a merge.
@@ -85,8 +85,8 @@ chezmerge --inner-path dotfiles
 
 ### 3. The Merge Process
 1.  **Analysis:** Chezmerge fetches upstream changes into `.chezmerge-upstream` and compares them to your local files.
-2.  **Auto-Merge:** Files you haven't touched are updated automatically.
-3.  **Conflict Resolution:** If both you and upstream changed a file, the TUI opens.
+2.  **Auto-Merge:** Files you haven't touched are updated automatically. If a local `.tmpl` file and an upstream raw dotfile render to the same target, Chezmerge will also merge non-overlapping changes into the template source automatically.
+3.  **Conflict Resolution:** If both you and upstream changed the same part of a file, the TUI opens. For templates, this means you only drop into manual resolution when the template source cannot be merged safely.
 4.  **Finalize:** Once all conflicts are resolved, Chezmerge stages merged files, advances the `.chezmerge-upstream` submodule pointer, and auto-commits with:
 ```bash
 chore(chezmerge): Merge upstream changes
@@ -117,6 +117,7 @@ Based on the differences, it assigns one of the following scenarios:
 * **Auto-Mergeable (`AUTO_MERGEABLE`):**
     * *Logic:* Both you and upstream changed the file, but in different places. Git can resolve this mathematically without conflicts.
     * *Action:* Chezmerge applies the merge automatically.
+    * *Template behavior:* This also applies when your local file is a Chezmoi template. Chezmerge merges the upstream change into the raw `.tmpl` source so your template logic is preserved.
 
 ### 🔴 Manual Intervention (Opens TUI)
 
@@ -124,8 +125,16 @@ Based on the differences, it assigns one of the following scenarios:
     * *Logic:* Both you and upstream changed the same lines of code. Git cannot resolve this automatically.
     * *Action:* Opens the **Interactive TUI** so you can manually edit the result.
 * **Template Divergence (`TEMPLATE_DIVERGENCE`):**
-    * *Logic:* The file is a Chezmoi template (`.tmpl`). Because templates contain logic that generates content, standard text merging is risky.
-    * *Action:* Unless the files are identical, Chezmerge treats this as a conflict and opens the TUI. This ensures you can verify that your template logic is preserved correctly.
+    * *Logic:* The file is a Chezmoi template (`.tmpl`), and both your template source and upstream changed in a way that cannot be merged automatically.
+    * *Action:* Chezmerge opens the TUI so you can resolve the conflict in the raw template source while still seeing the upstream, base, and rendered local context.
+
+### What Template Users Should Expect
+
+When a maintainer updates `.bashrc` upstream and your local source contains `dot_bashrc.tmpl`, Chezmerge treats them as the same target file.
+
+* If upstream changed lines that do not overlap with your template edits, Chezmerge merges the upstream changes directly into `dot_bashrc.tmpl`.
+* If upstream changed the same logical section as your template logic, Chezmerge stops and opens the merge UI or your configured external editor.
+* The editable result is always the raw template source, never the rendered output, so template tags like `{{ ... }}` are preserved.
 
 ---
 

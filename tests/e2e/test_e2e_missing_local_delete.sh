@@ -22,7 +22,7 @@ mkdir -p dotfiles/.config/ml4w/scripts/arch
 echo "echo printers" > dotfiles/.config/ml4w/scripts/arch/installprinters.sh
 git add .
 git commit -m "Initial commit with script"
-git push origin master
+git push origin HEAD
 cd "$PROJECT_ROOT"
 
 echo -e "${GREEN}=== Initializing Local ===${NC}"
@@ -38,7 +38,7 @@ echo -e "${GREEN}=== Deleting File Upstream ===${NC}"
 cd "$MAINTAINER_DIR"
 git rm dotfiles/.config/ml4w/scripts/arch/installprinters.sh
 git commit -m "Delete script upstream"
-git push origin master
+git push origin HEAD
 cd "$PROJECT_ROOT"
 
 echo -e "${GREEN}=== Running Update ===${NC}"

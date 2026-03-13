@@ -29,7 +29,7 @@ echo "content v1" > .f_remote_mod
 echo "content v1" > .f_both_mod
 git add .
 git commit -m "Initial commit"
-git push origin master
+git push origin HEAD
 cd "$PROJECT_ROOT"
 
 # 2. Initialize Local

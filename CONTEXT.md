@@ -28,8 +28,9 @@ The engine analyzes the 4-way state to automate trivial merges:
 *   **Already Synced**: Yours == Theirs → Skip.
 *   **Auto-Update**: Yours == Base && Theirs != Base → Update (if safe).
 *   **Auto-Keep**: Yours != Base && Theirs == Base → Keep Yours.
-*   **Conflict/Template**: Yours != Base && Theirs != Base → **Open TUI**.
-*   **Template Safety**: If the target is a template, the engine defaults to the TUI to prevent overwriting logic with raw upstream content.
+*   **Auto-Mergeable**: Yours != Base && Theirs != Base, but the changes do not overlap → Merge automatically.
+*   **Conflict/Template**: The changes overlap or the template source cannot be merged cleanly → **Open TUI**.
+*   **Template Safety**: If the target is a template, the engine merges into the raw `.tmpl` source when safe and falls back to the TUI only for real conflicts.
 
 ## User Experience (UX)
 

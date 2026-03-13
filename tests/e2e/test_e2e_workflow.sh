@@ -27,7 +27,7 @@ echo "alias ll='ls -l'" > .bashrc
 echo "set number" > .vimrc
 git add .
 git commit -m "Initial commit"
-git push origin master
+git push origin HEAD
 cd "$PROJECT_ROOT"
 
 # 2. Test Initialization

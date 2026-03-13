@@ -22,7 +22,7 @@ mkdir -p dotfiles
 echo "alias ll='ls -l'" > dotfiles/.bashrc
 git add dotfiles/.bashrc
 git commit -m "Initial commit"
-git push origin master
+git push origin HEAD
 cd "$PROJECT_ROOT"
 
 echo -e "${GREEN}=== Initializing Local with --inner-path dotfiles ===${NC}"
@@ -37,7 +37,7 @@ mkdir -p dotfiles2
 echo "should be ignored" > dotfiles2/ignore.me
 git add dotfiles2/ignore.me
 git commit -m "Add file outside inner-path but with prefix"
-git push origin master
+git push origin HEAD
 cd "$PROJECT_ROOT"
 
 OUTPUT=$(uv run --directory "$PROJECT_ROOT" -m chezmerge.main \

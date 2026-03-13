@@ -343,11 +343,14 @@ def run():
         scenario = engine.analyze(base_state, theirs_state, ours_state, template_state)
         
         merged_content = None
-        if scenario == MergeScenario.CONFLICT and not is_tmpl:
-            success, result = git.attempt_merge(base_content, ours_content, theirs_content)
+        if scenario == MergeScenario.CONFLICT:
+            merge_ours_content = template_content if is_tmpl else ours_content
+            success, result = git.attempt_merge(base_content, merge_ours_content, theirs_content)
             if success:
                 scenario = MergeScenario.AUTO_MERGEABLE
                 merged_content = result
+            elif is_tmpl:
+                scenario = MergeScenario.TEMPLATE_DIVERGENCE
         
         if scenario == MergeScenario.ALREADY_SYNCED:
             continue

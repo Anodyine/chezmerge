@@ -23,7 +23,7 @@ echo "# base" > dotfiles/.config/hypr/hyprland.conf
 
 git add .
 git commit -m "Initial commit"
-git push origin master
+git push origin HEAD
 cd "$PROJECT_ROOT"
 
 echo -e "${GREEN}=== Initializing Local ===${NC}"
@@ -43,7 +43,7 @@ chmod +x dotfiles/.config/ml4w/scripts/ml4w-toggle-allfloat
 
 git add .
 git commit -m "Add new executable script"
-git push origin master
+git push origin HEAD
 cd "$PROJECT_ROOT"
 
 echo -e "${GREEN}=== Running Update ===${NC}"

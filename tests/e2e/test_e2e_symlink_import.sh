@@ -29,7 +29,7 @@ ln -s target.txt dotfiles/.config/app/link.txt
 
 git add .
 git commit -m "Initial commit with symlink"
-git push origin master
+git push origin HEAD
 cd "$PROJECT_ROOT"
 
 # 2. Initialize via chezmerge

@@ -23,11 +23,18 @@ class DecisionEngine:
         """
         # 1. Check for Template Safety
         if template.is_template:
-            # If it's a template, we almost always want to show the UI 
-            # unless the update is identical to what we already have.
+            # Templates are merged based on source content, but we can skip
+            # work entirely when the rendered output already matches upstream.
             if ours.content == theirs.content:
                 return MergeScenario.ALREADY_SYNCED
-            return MergeScenario.TEMPLATE_DIVERGENCE
+
+            if template.content == base.content and theirs.content != base.content:
+                return MergeScenario.AUTO_UPDATE
+
+            if template.content != base.content and theirs.content == base.content:
+                return MergeScenario.AUTO_KEEP
+
+            return MergeScenario.CONFLICT
 
         # 2. Standard 3-way merge logic for raw files
         if ours.content == theirs.content:

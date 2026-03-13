@@ -27,7 +27,7 @@ cd "$MAINTAINER_DIR"
 for i in {1..10}; do echo "Line $i"; done > .config
 git add .
 git commit -m "Initial commit"
-git push origin master
+git push origin HEAD
 cd "$PROJECT_ROOT"
 
 # 2. Initialize Local

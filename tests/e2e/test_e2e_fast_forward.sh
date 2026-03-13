@@ -26,7 +26,7 @@ cd "$MAINTAINER_DIR"
 echo "version 1" > .config
 git add .
 git commit -m "Initial commit"
-git push origin master
+git push origin HEAD
 cd "$PROJECT_ROOT"
 
 # 2. Initialize Local
