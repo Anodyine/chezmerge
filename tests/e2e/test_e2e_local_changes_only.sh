@@ -35,9 +35,13 @@ uv run --directory "$PROJECT_ROOT" -m chezmerge.main \
     --repo "$REMOTE_REPO" \
     --source "$USER_DIR"
 
+git -C "$USER_DIR" add .
+git -C "$USER_DIR" commit -m "Baseline import" >/dev/null
+
 # 3. Modify Local (Ours)
 echo -e "${GREEN}=== Modifying Local File ===${NC}"
 echo "version 1 modified" > "$USER_DIR/dot_config"
+git -C "$USER_DIR" commit -am "Modify local config" >/dev/null
 
 # 4. Run Update (No Upstream Changes)
 echo -e "${GREEN}=== Running Update ===${NC}"

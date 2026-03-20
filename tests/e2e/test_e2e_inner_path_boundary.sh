@@ -31,6 +31,9 @@ uv run --directory "$PROJECT_ROOT" -m chezmerge.main \
   --source "$USER_DIR" \
   --inner-path "dotfiles"
 
+git -C "$USER_DIR" add .
+git -C "$USER_DIR" commit -m "Baseline import" >/dev/null
+
 echo -e "${GREEN}=== Changing sibling prefix path dotfiles2 ===${NC}"
 cd "$MAINTAINER_DIR"
 mkdir -p dotfiles2

@@ -82,7 +82,10 @@ chezmerge --inner-path dotfiles
 **Common Options:**
 * `--inner-path <path>`: Use this when dotfiles are in a subdirectory of the upstream repo (for ML4W, use `--inner-path dotfiles`).
 * `--dry-run`: Simulate merge logic without writing files or committing.
-* `--abort`: Roll back the current uncommitted chezmerge session and restore only the paths chezmerge changed.
+* `--abort`: Throw away the current uncommitted chezmerge session and reset the repo back to the pre-merge state.
+* `--undo-last`: Revert the most recent committed chezmerge merge by creating a new git commit.
+
+Chezmerge requires a clean working tree before starting a merge. Commit, stash, or discard any pending changes first. The exception is `--abort`, which is specifically meant to recover an in-progress chezmerge session.
 
 ### 3. The Merge Process
 1.  **Analysis:** Chezmerge fetches upstream changes into `.chezmerge-upstream` and compares them to your local files.

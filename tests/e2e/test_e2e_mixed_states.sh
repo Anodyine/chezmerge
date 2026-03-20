@@ -38,6 +38,9 @@ uv run --directory "$PROJECT_ROOT" -m chezmerge.main \
     --repo "$REMOTE_REPO" \
     --source "$USER_DIR"
 
+git -C "$USER_DIR" add .
+git -C "$USER_DIR" commit -m "Baseline import" >/dev/null
+
 # 3. Create Divergences
 
 # A. Modify Upstream (Theirs)
@@ -53,6 +56,7 @@ cd "$PROJECT_ROOT"
 echo -e "${GREEN}=== Modifying Local ===${NC}"
 echo "content v1 local" > "$USER_DIR/dot_f_local_mod"
 echo "content v1 local" > "$USER_DIR/dot_f_both_mod"
+git -C "$USER_DIR" commit -am "Local changes" >/dev/null
 
 # 4. Run Update (Dry Run)
 echo -e "${GREEN}=== Running Update (Dry Run) ===${NC}"

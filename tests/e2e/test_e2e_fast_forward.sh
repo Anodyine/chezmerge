@@ -35,6 +35,9 @@ uv run --directory "$PROJECT_ROOT" -m chezmerge.main \
     --repo "$REMOTE_REPO" \
     --source "$USER_DIR"
 
+git -C "$USER_DIR" add .
+git -C "$USER_DIR" commit -m "Baseline import" >/dev/null
+
 # Verify Init
 if grep -q "version 1" "$USER_DIR/dot_config"; then
     echo "Init successful."

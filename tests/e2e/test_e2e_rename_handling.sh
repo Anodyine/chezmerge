@@ -32,8 +32,12 @@ uv run --directory "$PROJECT_ROOT" -m chezmerge.main \
   --source "$USER_DIR" \
   --inner-path "dotfiles"
 
+git -C "$USER_DIR" add .
+git -C "$USER_DIR" commit -m "Baseline import" >/dev/null
+
 echo -e "${GREEN}=== Creating Local Modification for Rename Conflict Case ===${NC}"
 echo "local customized content" > "$USER_DIR/dot_modold"
+git -C "$USER_DIR" commit -am "Local rename candidate customization" >/dev/null
 
 echo -e "${GREEN}=== Renaming Files Upstream ===${NC}"
 cd "$MAINTAINER_DIR"

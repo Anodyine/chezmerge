@@ -33,6 +33,9 @@ uv run --directory "$PROJECT_ROOT" -m chezmerge.main \
   --repo "$REMOTE_REPO" \
   --source "$USER_DIR"
 
+git -C "$USER_DIR" add .
+git -C "$USER_DIR" commit -m "Baseline import" >/dev/null
+
 echo -e "${GREEN}=== Updating Upstream Binary ===${NC}"
 cd "$MAINTAINER_DIR"
 python - <<'PY'

@@ -29,6 +29,9 @@ uv run --directory "$PROJECT_ROOT" -m chezmerge.main \
   --repo "$REMOTE_REPO" \
   --source "$USER_DIR"
 
+git -C "$USER_DIR" add .
+git -C "$USER_DIR" commit -m "Baseline import" >/dev/null
+
 echo -e "${GREEN}=== Adding New Upstream File ===${NC}"
 cd "$MAINTAINER_DIR"
 echo "set number" > .vimrc

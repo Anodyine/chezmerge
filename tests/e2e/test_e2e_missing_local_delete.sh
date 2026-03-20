@@ -31,8 +31,13 @@ uv run --directory "$PROJECT_ROOT" -m chezmerge.main \
   --source "$USER_DIR" \
   --inner-path "dotfiles"
 
+git -C "$USER_DIR" add .
+git -C "$USER_DIR" commit -m "Baseline import" >/dev/null
+
 echo -e "${GREEN}=== Removing Local Counterpart Manually ===${NC}"
 rm -f "$USER_DIR/dot_config/ml4w/scripts/arch/installprinters.sh"
+git -C "$USER_DIR" add -A
+git -C "$USER_DIR" commit -m "Remove local counterpart" >/dev/null
 
 echo -e "${GREEN}=== Deleting File Upstream ===${NC}"
 cd "$MAINTAINER_DIR"

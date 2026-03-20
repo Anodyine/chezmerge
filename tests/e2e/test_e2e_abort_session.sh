@@ -35,6 +35,7 @@ git -C "$USER_DIR" commit -m "Baseline import" >/dev/null
 
 echo -e "${GREEN}=== Creating Divergence ===${NC}"
 echo "local customization" >> "$USER_DIR/dot_zshrc"
+git -C "$USER_DIR" commit -am "Customize zshrc locally" >/dev/null
 cd "$MAINTAINER_DIR"
 git rm .zshrc
 echo "brand new upstream file" > extra.txt
@@ -114,9 +115,8 @@ if [ -e "$USER_DIR/.git/chezmerge-session/manifest.json" ]; then
 fi
 
 STATUS=$(git -C "$USER_DIR" status --porcelain)
-EXPECTED_STATUS=" M dot_zshrc"
-if [ "$STATUS" != "$EXPECTED_STATUS" ]; then
-  echo "FAILURE: Abort should preserve the original local customization and remove only chezmerge session changes"
+if [ -n "$STATUS" ]; then
+  echo "FAILURE: Abort should leave the repo clean after restoring the committed pre-merge state"
   echo "$STATUS"
   exit 1
 fi

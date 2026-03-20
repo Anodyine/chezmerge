@@ -51,6 +51,8 @@ EOF
 # This establishes the baseline
 echo "--- Initializing Chezmerge ---"
 uv run python -m chezmerge.main --repo "$UPSTREAM_DIR" --source "$LOCAL_DIR" > /dev/null
+git -C "$LOCAL_DIR" add .
+git -C "$LOCAL_DIR" commit -m "Baseline import" --quiet
 
 # 4. Update Upstream
 # Simulate the upstream project changing the same logical line

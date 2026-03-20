@@ -29,8 +29,12 @@ uv run --directory "$PROJECT_ROOT" -m chezmerge.main \
   --repo "$REMOTE_REPO" \
   --source "$USER_DIR"
 
+git -C "$USER_DIR" add .
+git -C "$USER_DIR" commit -m "Baseline import" >/dev/null
+
 echo -e "${GREEN}=== Modifying Local File ===${NC}"
 echo "local customization" >> "$USER_DIR/dot_zshrc"
+git -C "$USER_DIR" commit -am "Customize zshrc locally" >/dev/null
 
 echo -e "${GREEN}=== Deleting Upstream File ===${NC}"
 cd "$MAINTAINER_DIR"

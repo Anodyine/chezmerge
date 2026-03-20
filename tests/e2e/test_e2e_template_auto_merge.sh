@@ -59,6 +59,8 @@ EOF
 
 echo "--- Initializing Chezmerge ---"
 uv run python -m chezmerge.main --repo "$UPSTREAM_DIR" --source "$LOCAL_DIR" > /dev/null
+git -C "$LOCAL_DIR" add .
+git -C "$LOCAL_DIR" commit -m "Baseline import" --quiet
 
 echo "--- Updating Upstream ---"
 cd "$UPSTREAM_DIR"

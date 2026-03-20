@@ -36,6 +36,9 @@ uv run --directory "$PROJECT_ROOT" -m chezmerge.main \
     --repo "$REMOTE_REPO" \
     --source "$USER_DIR"
 
+git -C "$USER_DIR" add .
+git -C "$USER_DIR" commit -m "Baseline import" >/dev/null
+
 # Verify Init
 if [ -f "$USER_DIR/dot_bashrc" ]; then
     echo "SUCCESS: dot_bashrc created."
@@ -56,6 +59,7 @@ cd "$PROJECT_ROOT"
 
 # B. Update Local (Ours)
 echo "# My local customization" >> "$USER_DIR/dot_bashrc"
+git -C "$USER_DIR" commit -am "Add local customization" >/dev/null
 
 # 4. Test Update (Dry Run)
 echo -e "${GREEN}=== Testing Update Detection (Dry Run) ===${NC}"

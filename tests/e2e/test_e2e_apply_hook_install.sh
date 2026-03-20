@@ -33,6 +33,9 @@ uv run --directory "$PROJECT_ROOT" -m chezmerge.main \
     --repo "$REMOTE_REPO" \
     --source "$USER_DIR"
 
+git -C "$USER_DIR" add .
+git -C "$USER_DIR" commit -m "Baseline import" >/dev/null
+
 if [ ! -f "$POST_MERGE_HOOK" ] || [ ! -f "$POST_REWRITE_HOOK" ]; then
     echo "FAILURE: Expected git hooks were not created."
     ls -la "$HOOK_DIR" || true
@@ -81,6 +84,8 @@ cat > "$POST_MERGE_HOOK" <<'EOF'
 echo "custom user hook"
 EOF
 chmod +x "$POST_MERGE_HOOK"
+git -C "$USER_DIR" add .githooks/post-merge
+git -C "$USER_DIR" commit -m "Customize post-merge hook" >/dev/null
 
 uv run --directory "$PROJECT_ROOT" -m chezmerge.main \
     --repo "$REMOTE_REPO" \
@@ -99,6 +104,8 @@ cat > "$POST_REWRITE_HOOK" <<'EOF'
 echo "old hook content"
 EOF
 chmod +x "$POST_REWRITE_HOOK"
+git -C "$USER_DIR" add .githooks/post-rewrite
+git -C "$USER_DIR" commit -m "Stale managed post-rewrite hook" >/dev/null
 
 git -C "$USER_DIR" config --local core.hooksPath .git/hooks
 

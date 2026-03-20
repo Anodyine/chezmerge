@@ -19,6 +19,7 @@ def parse_args():
     parser.add_argument("--editor", help="External editor to use for merges (e.g. nvim, vim, vi)")
     parser.add_argument("--dry-run", action="store_true", help="Simulate merge logic without launching UI")
     parser.add_argument("--abort", action="store_true", help="Abort the current uncommitted chezmerge session")
+    parser.add_argument("--undo-last", action="store_true", help="Revert the most recent committed chezmerge merge")
     return parser.parse_args()
 
 def render_chezmoi_template(content: str) -> str:
@@ -88,9 +89,41 @@ def run():
             print("No active chezmerge session found.")
         return
 
+    if args.undo_last:
+        if session.has_session():
+            print("An uncommitted chezmerge session is already in progress.")
+            print("Run 'chezmerge --abort' before undoing the last committed merge.")
+            return
+
+        if git.has_pending_changes():
+            print("Refusing to undo the last chezmerge merge because the repository has pending changes.")
+            print("Commit, stash, or discard them first so the revert can run safely.")
+            return
+
+        commit_sha = git.find_last_chezmerge_commit()
+        if not commit_sha:
+            print("No completed chezmerge merge commit was found to undo.")
+            return
+
+        try:
+            git.revert_commit(commit_sha)
+            git.sync_submodule_to_index()
+        except subprocess.CalledProcessError:
+            print("Failed to revert the last chezmerge merge commit cleanly.")
+            print("Resolve the git revert state manually or abort it with 'git revert --abort'.")
+            return
+
+        print(f"Reverted chezmerge merge commit {commit_sha}.")
+        return
+
     if session.has_session():
         print("An uncommitted chezmerge session is already in progress.")
         print("Run 'chezmerge --abort' to roll it back before starting a new merge.")
+        return
+
+    if git.has_pending_changes():
+        print("Refusing to run because the repository has pending changes.")
+        print("Commit, stash, or discard them first, then rerun chezmerge.")
         return
     
     # 1. Initialization Phase

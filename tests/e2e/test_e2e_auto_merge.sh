@@ -36,6 +36,9 @@ uv run --directory "$PROJECT_ROOT" -m chezmerge.main \
     --repo "$REMOTE_REPO" \
     --source "$USER_DIR"
 
+git -C "$USER_DIR" add .
+git -C "$USER_DIR" commit -m "Baseline import" >/dev/null
+
 # 3. Create Non-Overlapping Divergence
 
 # A. Modify Upstream (Change Line 1)
@@ -51,6 +54,7 @@ cd "$PROJECT_ROOT"
 echo -e "${GREEN}=== Modifying Local (Line 10) ===${NC}"
 # Replace Line 10
 sed -i.bak 's/^Line 10$/Line 10 Modified Local/' "$USER_DIR/dot_config" && rm "$USER_DIR/dot_config.bak"
+git -C "$USER_DIR" commit -am "Customize line 10 locally" >/dev/null
 
 # 4. Run Update (Dry Run to check detection)
 echo -e "${GREEN}=== Running Update (Dry Run) ===${NC}"

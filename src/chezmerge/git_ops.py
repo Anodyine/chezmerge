@@ -209,6 +209,25 @@ git submodule update --init --recursive .chezmerge-upstream || true
         )
         return result.returncode == 0
 
+    def has_pending_changes(self) -> bool:
+        """Returns True when the repository has staged, unstaged, or untracked changes."""
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=self.repo_path,
+            capture_output=True,
+            text=True
+        )
+        return bool(result.stdout.strip())
+
+    def restore_repo_to_head(self):
+        """Restores tracked files and index entries to HEAD."""
+        self.run_git(["restore", "--staged", "."])
+        self.run_git(["restore", "."])
+
+    def clean_untracked_files(self):
+        """Removes untracked files and directories from the repository."""
+        self.run_git(["clean", "-fd"])
+
     def get_index_entry(self, path: str) -> Optional[dict[str, str]]:
         """Returns the mode and blob SHA stored in the index for path, if present."""
         result = subprocess.run(
@@ -294,6 +313,10 @@ git submodule update --init --recursive .chezmerge-upstream || true
         rel_path = str(self.upstream_path.relative_to(self.repo_path))
         self.run_git(["add", rel_path])
 
+    def checkout_submodule(self, sha: str):
+        """Checks out the upstream submodule worktree at sha without staging the pointer."""
+        self.run_git(["checkout", sha], cwd=self.upstream_path)
+
     def stage_file(self, path: str):
         """Stages a file change in the main repository (add/update/delete)."""
         self.run_git(["add", "-A", "--", path])
@@ -315,6 +338,31 @@ git submodule update --init --recursive .chezmerge-upstream || true
     def commit(self, message: str):
         """Commits staged changes."""
         self.run_git(["commit", "-m", message])
+
+    def find_last_chezmerge_commit(self) -> Optional[str]:
+        """Returns the SHA of the most recent completed chezmerge merge commit."""
+        result = subprocess.run(
+            [
+                "git", "log",
+                "--format=%H",
+                "--grep", "chore(chezmerge): Merge upstream changes",
+                "-n", "1",
+            ],
+            cwd=self.repo_path,
+            capture_output=True,
+            text=True
+        )
+        sha = result.stdout.strip()
+        return sha or None
+
+    def revert_commit(self, sha: str):
+        """Reverts commit sha by creating a new commit."""
+        self.run_git(["revert", "--no-edit", sha])
+
+    def sync_submodule_to_index(self):
+        """Checks out submodule worktrees to the commits recorded in the index."""
+        rel_path = str(self.upstream_path.relative_to(self.repo_path))
+        self.run_git(["submodule", "update", "--init", "--recursive", rel_path])
 
     def attempt_merge(self, base: str, ours: str, theirs: str) -> tuple[bool, str]:
         """
