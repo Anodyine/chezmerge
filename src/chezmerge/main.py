@@ -15,12 +15,30 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Chezmerge: Intelligent Dotfile Merger")
     parser.add_argument("--repo", help="Upstream git repository URL")
     parser.add_argument("--inner-path", default="", help="Subdirectory inside upstream repo containing dotfiles")
-    parser.add_argument("--source", default="~/.local/share/chezmoi", help="Local chezmoi source directory")
+    parser.add_argument("--source", help="Local chezmoi source directory (defaults to chezmoi source-path)")
     parser.add_argument("--editor", help="External editor to use for merges (e.g. nvim, vim, vi)")
     parser.add_argument("--dry-run", action="store_true", help="Simulate merge logic without launching UI")
     parser.add_argument("--abort", action="store_true", help="Abort the current uncommitted chezmerge session")
     parser.add_argument("--undo-last", action="store_true", help="Revert the most recent committed chezmerge merge")
     return parser.parse_args()
+
+
+def discover_default_source_path() -> Path:
+    """Returns the configured chezmoi source path, or the conventional default."""
+    try:
+        result = subprocess.run(
+            ["chezmoi", "source-path"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        source_path = result.stdout.strip()
+        if source_path:
+            return Path(source_path).expanduser().resolve()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+
+    return Path("~/.local/share/chezmoi").expanduser().resolve()
 
 def render_chezmoi_template(content: str) -> str:
     """
@@ -73,7 +91,17 @@ def import_new_upstream_file(git: GitHandler, rel_target_path: str, upstream_fil
 
 def run():
     args = parse_args()
-    local_path = Path(args.source).expanduser().resolve()
+    explicit_source = args.source is not None
+    local_path = Path(args.source).expanduser().resolve() if explicit_source else discover_default_source_path()
+
+    if not explicit_source:
+        cwd = Path.cwd().resolve()
+        if cwd != local_path:
+            print("Refusing to run outside your chezmoi source directory.")
+            print(f"Current directory: {cwd}")
+            print(f"Expected chezmoi source: {local_path}")
+            print("Run chezmerge from your chezmoi source directory or pass --source <path> explicitly.")
+            return
     
     if not local_path.exists():
         print(f"Creating local directory: {local_path}")
