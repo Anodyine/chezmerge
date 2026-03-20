@@ -73,7 +73,14 @@ git submodule update --init --recursive .chezmerge-upstream || true
         self.run_git(["config", "--local", "core.hooksPath", self.PULL_HOOKS_DIR])
         print(f"Configured core.hooksPath={self.PULL_HOOKS_DIR}")
 
-    def run_git(self, args: list[str], cwd: Optional[Path] = None, strip: bool = True, text: bool = True):
+    def run_git(
+        self,
+        args: list[str],
+        cwd: Optional[Path] = None,
+        strip: bool = True,
+        text: bool = True,
+        quiet_failure: bool = False,
+    ):
         """Executes a git command."""
         target_cwd = cwd if cwd else self.repo_path
         try:
@@ -89,9 +96,10 @@ git submodule update --init --recursive .chezmerge-upstream || true
                 return stdout.strip() if strip else stdout
             return stdout
         except subprocess.CalledProcessError as e:
-            print(f"Git command failed: git {' '.join(args)}")
-            print(f"CWD: {target_cwd}")
-            print(f"Error: {e.stderr}")
+            if not quiet_failure:
+                print(f"Git command failed: git {' '.join(args)}")
+                print(f"CWD: {target_cwd}")
+                print(f"Error: {e.stderr}")
             raise
 
     def is_initialized(self) -> bool:
@@ -180,10 +188,23 @@ git submodule update --init --recursive .chezmerge-upstream || true
         # 'latest' is the remote HEAD
         ref = "HEAD" if source == "base" else "origin/HEAD"
         try:
-            raw = self.run_git(["show", f"{ref}:{path}"], cwd=self.upstream_path, strip=False, text=False)
+            raw = self.run_git(
+                ["show", f"{ref}:{path}"],
+                cwd=self.upstream_path,
+                strip=False,
+                text=False,
+                quiet_failure=True,
+            )
             return raw.decode("utf-8", errors="surrogateescape")
         except subprocess.CalledProcessError:
             return ""
+
+    def is_probably_binary_content(self, content: str) -> bool:
+        """Heuristic: treat NULs or surrogateescaped bytes as binary content."""
+        if "\x00" in content:
+            return True
+
+        return any(0xDC80 <= ord(ch) <= 0xDCFF for ch in content)
 
     def get_file_mode(self, ref: str, path: str) -> Optional[str]:
         """Gets the git mode for a file at ref:path (e.g. 100644, 100755, 120000)."""

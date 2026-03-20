@@ -59,3 +59,5 @@ class MergeItem:
     template: FileState
     scenario: MergeScenario = MergeScenario.CONFLICT
     delete_on_save: bool = False
+    deletion_reviewed: bool = False
+    deletion_inspecting: bool = False

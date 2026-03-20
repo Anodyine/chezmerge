@@ -130,7 +130,7 @@ Based on the differences, it assigns one of the following scenarios:
     * *Action:* Opens the **Interactive TUI** so you can manually edit the result.
 * **Deletion Conflict (`DELETION_CONFLICT`):**
     * *Logic:* Upstream deleted the file, but you changed it locally since the last sync.
-    * *Action:* Opens the merge UI so you can either keep the file as reference for later repair or delete it to match upstream.
+    * *Action:* Opens a choice prompt first so you can keep it as reference, delete it to match upstream, or inspect it before deciding.
 * **Template Divergence (`TEMPLATE_DIVERGENCE`):**
     * *Logic:* The file is a Chezmoi template (`.tmpl`), and both your template source and upstream changed in a way that cannot be merged automatically.
     * *Action:* Chezmerge opens the TUI so you can resolve the conflict in the raw template source while still seeing the upstream, base, and rendered local context.
@@ -162,14 +162,17 @@ When manual intervention is required, the TUI launches with a grid layout:
 | :--- | :--- |
 | `Ctrl+t` | **Cycle Focus** between the panes. |
 | `Ctrl+m` | **Open External Editor** (Vim/Neovim). |
-| `Ctrl+d` | **Delete To Match Upstream** for delete-vs-modified conflicts. Choose this when you want to align with upstream and drop your local copy. |
-| `Ctrl+s` | **Save & Next**. For delete-vs-modified conflicts, this keeps the file as reference or lets you adapt it, but it does not guarantee upstream still invokes it. |
+| `k` | In the deleted-upstream choice screen, **Keep** the file as reference for later adaptation. |
+| `d` | In the deleted-upstream choice screen, **Delete** the file to match upstream. |
+| `l` | In the deleted-upstream choice screen, **Take A Look** before deciding. |
+| `Ctrl+s` | **Keep / Save** in the merge editor. |
 | `Ctrl+q` | **Quit** the application. |
 
 For upstream deletion conflicts, Chezmerge intentionally does **not** treat “keep” as “fully resolved behavior.”
 
-* Choose **Save & Next** when you want to preserve your local customization as reference material, especially if you plan to manually reconnect it later or use an LLM agent to migrate the behavior into the new upstream structure.
-* Choose **Delete To Match Upstream** when you believe the upstream deletion reflects the new desired behavior and you do not need the old customization anymore.
+* Choose **Keep** when you want to preserve your local customization as reference material, especially if you plan to manually reconnect it later or use an LLM agent to migrate the behavior into the new upstream structure.
+* Choose **Delete** when you believe the upstream deletion reflects the new desired behavior and you do not need the old customization anymore.
+* Choose **Take A Look** when you do not remember what changed and want to inspect or edit the file first. After you leave that review step, Chezmerge asks again whether you want to keep what you just saved or delete it.
 
 ---
 
