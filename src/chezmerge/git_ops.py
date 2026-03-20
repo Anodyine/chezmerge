@@ -209,6 +209,26 @@ git submodule update --init --recursive .chezmerge-upstream || true
         )
         return result.returncode == 0
 
+    def get_index_entry(self, path: str) -> Optional[dict[str, str]]:
+        """Returns the mode and blob SHA stored in the index for path, if present."""
+        result = subprocess.run(
+            ["git", "ls-files", "--stage", "--", path],
+            cwd=self.repo_path,
+            capture_output=True,
+            text=True
+        )
+        if result.returncode != 0 or not result.stdout.strip():
+            return None
+
+        for line in result.stdout.splitlines():
+            parts = line.split()
+            if len(parts) < 4:
+                continue
+            mode, sha, stage = parts[0], parts[1], parts[2]
+            if stage == "0":
+                return {"mode": mode, "sha": sha}
+        return None
+
     def get_upstream_changes(self, inner_path: str = "") -> list[tuple[str, str, Optional[str]]]:
         """
         Compares submodule HEAD and origin/HEAD and returns:
@@ -266,14 +286,31 @@ git submodule update --init --recursive .chezmerge-upstream || true
     def update_base_pointer(self):
         """Updates the submodule to match origin/HEAD and stages it in the main repo."""
         latest_sha = self.get_head_rev("origin/HEAD")
-        self.run_git(["checkout", latest_sha], cwd=self.upstream_path)
-        
+        self.set_submodule_pointer(latest_sha)
+
+    def set_submodule_pointer(self, sha: str):
+        """Checks out the upstream submodule at sha and stages the submodule pointer."""
+        self.run_git(["checkout", sha], cwd=self.upstream_path)
         rel_path = str(self.upstream_path.relative_to(self.repo_path))
         self.run_git(["add", rel_path])
 
     def stage_file(self, path: str):
         """Stages a file change in the main repository (add/update/delete)."""
         self.run_git(["add", "-A", "--", path])
+
+    def restore_index_entry(self, path: str, mode: Optional[str], sha: Optional[str]):
+        """Restores a single index entry to a previously recorded state."""
+        if mode and sha:
+            self.run_git(["update-index", "--add", "--cacheinfo", f"{mode},{sha},{path}"])
+            return
+
+        subprocess.run(
+            ["git", "rm", "--cached", "-q", "--ignore-unmatch", "--", path],
+            cwd=self.repo_path,
+            capture_output=True,
+            text=True,
+            check=False
+        )
 
     def commit(self, message: str):
         """Commits staged changes."""

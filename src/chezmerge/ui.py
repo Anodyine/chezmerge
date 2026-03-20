@@ -7,7 +7,7 @@ from pathlib import Path
 from textual.app import App, ComposeResult
 from textual.containers import Grid
 from textual.widgets import Header, Footer, TextArea
-from .logic import MergeItem
+from .logic import MergeItem, MergeScenario
 
 class ChezmergeApp(App[list[MergeItem]]):
     CSS = """
@@ -32,6 +32,7 @@ class ChezmergeApp(App[list[MergeItem]]):
 
     BINDINGS = [
         ("ctrl+s", "save_merge", "Save & Next"),
+        ("ctrl+d", "accept_deletion", "Delete To Match Upstream"),
         ("ctrl+q", "quit", "Quit"),
         ("ctrl+c", "copy", "Copy"),
         ("ctrl+v", "paste", "Paste"),
@@ -187,18 +188,33 @@ class ChezmergeApp(App[list[MergeItem]]):
             widget.text = content
             widget.border_title = title
 
-        set_pane("theirs", "Theirs (Upstream)", item.theirs.content)
-        set_pane("base", "Base (Ancestor)", item.base.content)
-        set_pane("ours", "Ours (Local)", item.ours.content)
+        theirs_title = "Theirs (Upstream)"
+        base_title = "Base (Ancestor)"
+        ours_title = "Ours (Local)"
+        template_title = f"Template (Editable): {item.path}"
+        if item.scenario == MergeScenario.DELETION_CONFLICT:
+            theirs_title = "Theirs (Deleted Upstream)"
+            base_title = "Base (Last Synced)"
+            ours_title = "Ours (Current Local)"
+            template_title = f"Keep As Reference Or Adapt: {item.path}"
+
+        set_pane("theirs", theirs_title, item.theirs.content)
+        set_pane("base", base_title, item.base.content)
+        set_pane("ours", ours_title, item.ours.content)
         
         # Template is special: it gets focus
         template_widget = self.query_one("#template", TextArea)
         template_widget.text = item.template.content
-        template_widget.border_title = f"Template (Editable): {item.path}"
+        template_widget.border_title = template_title
         template_widget.focus()
 
+        if item.scenario == MergeScenario.DELETION_CONFLICT:
+            self.notify(
+                "Upstream deleted this file. Ctrl+s keeps it as reference or lets you adapt it; Ctrl+d deletes it to match upstream."
+            )
+
         # Auto-launch external editor if configured
-        if self.external_editor:
+        if self.external_editor and item.scenario != MergeScenario.DELETION_CONFLICT:
             # Use call_later to trigger immediately without waiting for a UI render
             self.call_later(self.action_edit_external)
 
@@ -207,7 +223,21 @@ class ChezmergeApp(App[list[MergeItem]]):
         if self.current_index < len(self.items):
             current_content = self.query_one("#template", TextArea).text
             self.items[self.current_index].template.content = current_content
+            self.items[self.current_index].delete_on_save = False
 
         # Advance
+        self.current_index += 1
+        self.load_current_item()
+
+    def action_accept_deletion(self):
+        if self.current_index >= len(self.items):
+            return
+
+        item = self.items[self.current_index]
+        if item.scenario != MergeScenario.DELETION_CONFLICT:
+            self.notify("Delete to match upstream is only available for upstream delete conflicts", severity="warning")
+            return
+
+        item.delete_on_save = True
         self.current_index += 1
         self.load_current_item()

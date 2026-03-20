@@ -8,6 +8,7 @@ class MergeScenario(Enum):
     AUTO_KEEP = auto()       # Yours != Base, Theirs == Base
     CONFLICT = auto()        # Yours != Base, Theirs != Base
     AUTO_MERGEABLE = auto()  # Conflict resolved automatically by git
+    DELETION_CONFLICT = auto()  # Upstream deleted the file, local modified it
     TEMPLATE_DIVERGENCE = auto() # Template logic detected, requires manual review
 
 @dataclass
@@ -57,3 +58,4 @@ class MergeItem:
     ours: FileState
     template: FileState
     scenario: MergeScenario = MergeScenario.CONFLICT
+    delete_on_save: bool = False

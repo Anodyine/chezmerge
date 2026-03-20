@@ -9,6 +9,7 @@ from .logic import MergeItem, FileState, MergeScenario, DecisionEngine
 from .git_ops import GitHandler
 from .paths import find_local_match, chezmoify_path
 from .importer import import_upstream
+from .session import MergeSessionManager
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Chezmerge: Intelligent Dotfile Merger")
@@ -17,6 +18,7 @@ def parse_args():
     parser.add_argument("--source", default="~/.local/share/chezmoi", help="Local chezmoi source directory")
     parser.add_argument("--editor", help="External editor to use for merges (e.g. nvim, vim, vi)")
     parser.add_argument("--dry-run", action="store_true", help="Simulate merge logic without launching UI")
+    parser.add_argument("--abort", action="store_true", help="Abort the current uncommitted chezmerge session")
     return parser.parse_args()
 
 def render_chezmoi_template(content: str) -> str:
@@ -77,6 +79,19 @@ def run():
         local_path.mkdir(parents=True, exist_ok=True)
 
     git = GitHandler(local_path)
+    session = MergeSessionManager(local_path)
+
+    if args.abort:
+        if session.abort(git):
+            print("Aborted chezmerge session and restored recorded paths.")
+        else:
+            print("No active chezmerge session found.")
+        return
+
+    if session.has_session():
+        print("An uncommitted chezmerge session is already in progress.")
+        print("Run 'chezmerge --abort' to roll it back before starting a new merge.")
+        return
     
     # 1. Initialization Phase
     if not git.is_initialized():
@@ -121,8 +136,9 @@ def run():
     
     merge_items = []
     engine = DecisionEngine()
+    session_started = False
+    base_submodule_sha = git.get_head_rev("HEAD")
     
-    deletion_conflicts: list[str] = []
     unresolved_missing: list[str] = []
 
     normalized_inner = args.inner_path.strip("/")
@@ -136,6 +152,16 @@ def run():
         if upstream_path.startswith(inner_prefix):
             return upstream_path[len(inner_prefix):]
         return None
+
+    def ensure_session_started():
+        nonlocal session_started
+        if not session_started:
+            session.start(base_submodule_sha)
+            session_started = True
+
+    def record_path_before_change(path: str):
+        ensure_session_started()
+        session.record_path(git, path)
 
     for change_type, upstream_file, source_upstream_file in changed_files:
         if change_type == "R":
@@ -168,6 +194,7 @@ def run():
                         print(f"  - {str(local_old)} [AUTO_DELETE]")
                     else:
                         print(f"Auto-deleting {rel_old_target} (upstream renamed outside inner path)...")
+                        record_path_before_change(str(local_old))
                         old_abs = local_path / str(local_old)
                         if old_abs.exists():
                             old_abs.unlink()
@@ -198,6 +225,11 @@ def run():
                     dest_rel = chezmoify_path(rel_new_target, executable=is_executable, symlink=is_symlink)
                     print(f"  - {dest_rel} [AUTO_IMPORT]")
                 else:
+                    mode = git.get_file_mode("origin/HEAD", new_upstream_file)
+                    is_symlink = mode == "120000"
+                    is_executable = mode == "100755"
+                    dest_rel = chezmoify_path(rel_new_target, executable=is_executable, symlink=is_symlink)
+                    record_path_before_change(dest_rel)
                     staged_path = import_new_upstream_file(git, rel_new_target, new_upstream_file)
                     print(f"Auto-importing renamed upstream file {new_upstream_file} -> {staged_path}")
                 continue
@@ -249,6 +281,9 @@ def run():
                     continue
 
             print(f"Auto-renaming {rel_old_target} -> {rel_new_target}...")
+            record_path_before_change(old_local_rel)
+            if new_local_rel != old_local_rel:
+                record_path_before_change(new_local_rel)
             if old_abs.exists() and new_abs != old_abs:
                 new_abs.parent.mkdir(parents=True, exist_ok=True)
                 old_abs.rename(new_abs)
@@ -281,6 +316,11 @@ def run():
                     dest_rel = chezmoify_path(rel_target_path, executable=is_executable, symlink=is_symlink)
                     print(f"  - {dest_rel} [AUTO_IMPORT]")
                 else:
+                    mode = git.get_file_mode("origin/HEAD", upstream_file)
+                    is_symlink = mode == "120000"
+                    is_executable = mode == "100755"
+                    dest_rel = chezmoify_path(rel_target_path, executable=is_executable, symlink=is_symlink)
+                    record_path_before_change(dest_rel)
                     staged_path = import_new_upstream_file(git, rel_target_path, upstream_file)
                     print(f"Auto-importing new upstream file {rel_target_path} -> {staged_path}")
                 continue
@@ -305,6 +345,7 @@ def run():
                     print(f"  - {str(local_file)} [AUTO_DELETE]")
                 else:
                     print(f"Auto-deleting {rel_target_path} (upstream deleted, local unchanged)...")
+                    record_path_before_change(str(local_file))
                     dest = local_path / str(local_file)
                     if dest.exists():
                         dest.unlink()
@@ -313,7 +354,20 @@ def run():
                 continue
 
             print(f"Deletion conflict: {rel_target_path} (upstream deleted, local file modified)")
-            deletion_conflicts.append(str(local_file))
+            print("  Keeping the local file preserves it as reference only; upstream may no longer invoke it.")
+            is_tmpl = str(local_file).endswith(".tmpl")
+            ours_content = raw_local_content
+            if is_tmpl:
+                ours_content = render_chezmoi_template(raw_local_content)
+
+            merge_items.append(MergeItem(
+                path=str(local_file),
+                base=FileState(base_content, rel_target_path),
+                theirs=FileState("", rel_target_path),
+                ours=FileState(ours_content, str(local_file)),
+                template=FileState(raw_local_content, str(local_file), is_template=is_tmpl),
+                scenario=MergeScenario.DELETION_CONFLICT
+            ))
             continue
 
         # Gather 4-way state
@@ -360,6 +414,7 @@ def run():
                 print(f"  - {str(local_file)} [{scenario.name}]")
             else:
                 print(f"Auto-merging {rel_target_path} ({scenario.name})...")
+                record_path_before_change(str(local_file))
                 # For AUTO_UPDATE, theirs_content is the target.
                 # For AUTO_MERGEABLE, merged_content is the target.
                 content_to_write = merged_content if scenario == MergeScenario.AUTO_MERGEABLE else theirs_content
@@ -380,13 +435,6 @@ def run():
             scenario=scenario
         ))
 
-    if deletion_conflicts:
-        print(f"{len(deletion_conflicts)} deletion conflict(s) require manual resolution:")
-        for path in deletion_conflicts:
-            print(f"  - {path}")
-        print("Aborting without commit so you can resolve these files manually.")
-        return
-
     if unresolved_missing:
         print(f"{len(unresolved_missing)} path(s) require manual resolution before advancing base pointer:")
         for path in unresolved_missing:
@@ -397,8 +445,10 @@ def run():
     if not merge_items:
         print("All changes merged automatically.")
         if not args.dry_run:
+            ensure_session_started()
             git.update_base_pointer()
             git.commit("chore(chezmerge): Merge upstream changes")
+            session.cleanup()
             print("Merge complete. Changes committed.")
         return
 
@@ -417,14 +467,26 @@ def run():
     if results:
         print("Applying changes to local files...")
         for item in results:
+            if item.delete_on_save:
+                record_path_before_change(item.path)
+                dest = local_path / item.path
+                if dest.exists():
+                    dest.unlink()
+                git.stage_file(item.path)
+                print(f"Deleted {item.path}")
+                continue
+
             # Write the template content back to the local file
+            record_path_before_change(item.path)
             git.write_local_file(item.path, item.template.content)
             git.stage_file(item.path)
             print(f"Updated {item.path}")
         
         # Update base pointer so we don't process these again
+        ensure_session_started()
         git.update_base_pointer()
         git.commit("chore(chezmerge): Merge upstream changes")
+        session.cleanup()
         print("Merge complete. Changes committed.")
 
 if __name__ == "__main__":

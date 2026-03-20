@@ -13,7 +13,7 @@ Keeping your dotfiles in sync with an upstream repository (like [ML4W](https://g
 
 ## ✨ Features
 
-* **Visual 3-Way Merge:** See exactly what changed across three panes (Theirs, Base, Ours).
+* **Visual Merge Resolution:** See exactly what changed across upstream, base, and local panes, including upstream deletions.
 * **Template Awareness:** Understands `chezmoi` file naming conventions (`dot_`, `private_`, `executable_`) and maps templates to the same target path as upstream dotfiles.
 * **Smart Analysis:** Automatically detects safe updates versus complex conflicts, including non-overlapping changes inside template source files.
 * **External Editor Integration:** * Seamlessly open the current merge in **Neovim**, **Vim**, or **Vi**.
@@ -82,11 +82,12 @@ chezmerge --inner-path dotfiles
 **Common Options:**
 * `--inner-path <path>`: Use this when dotfiles are in a subdirectory of the upstream repo (for ML4W, use `--inner-path dotfiles`).
 * `--dry-run`: Simulate merge logic without writing files or committing.
+* `--abort`: Roll back the current uncommitted chezmerge session and restore only the paths chezmerge changed.
 
 ### 3. The Merge Process
 1.  **Analysis:** Chezmerge fetches upstream changes into `.chezmerge-upstream` and compares them to your local files.
 2.  **Auto-Merge:** Files you haven't touched are updated automatically. If a local `.tmpl` file and an upstream raw dotfile render to the same target, Chezmerge will also merge non-overlapping changes into the template source automatically.
-3.  **Conflict Resolution:** If both you and upstream changed the same part of a file, the TUI opens. For templates, this means you only drop into manual resolution when the template source cannot be merged safely.
+3.  **Conflict Resolution:** If both you and upstream changed the same part of a file, or if upstream deleted a file you modified locally, the TUI opens. For templates, this means you only drop into manual resolution when the template source cannot be merged safely.
 4.  **Finalize:** Once all conflicts are resolved, Chezmerge stages merged files, advances the `.chezmerge-upstream` submodule pointer, and auto-commits with:
 ```bash
 chore(chezmerge): Merge upstream changes
@@ -124,6 +125,9 @@ Based on the differences, it assigns one of the following scenarios:
 * **Conflict (`CONFLICT`):**
     * *Logic:* Both you and upstream changed the same lines of code. Git cannot resolve this automatically.
     * *Action:* Opens the **Interactive TUI** so you can manually edit the result.
+* **Deletion Conflict (`DELETION_CONFLICT`):**
+    * *Logic:* Upstream deleted the file, but you changed it locally since the last sync.
+    * *Action:* Opens the merge UI so you can either keep the file as reference for later repair or delete it to match upstream.
 * **Template Divergence (`TEMPLATE_DIVERGENCE`):**
     * *Logic:* The file is a Chezmoi template (`.tmpl`), and both your template source and upstream changed in a way that cannot be merged automatically.
     * *Action:* Chezmerge opens the TUI so you can resolve the conflict in the raw template source while still seeing the upstream, base, and rendered local context.
@@ -155,8 +159,14 @@ When manual intervention is required, the TUI launches with a grid layout:
 | :--- | :--- |
 | `Ctrl+t` | **Cycle Focus** between the panes. |
 | `Ctrl+m` | **Open External Editor** (Vim/Neovim). |
-| `Ctrl+s` | **Save & Next**. Saves the current file and moves to the next conflict. |
+| `Ctrl+d` | **Delete To Match Upstream** for delete-vs-modified conflicts. Choose this when you want to align with upstream and drop your local copy. |
+| `Ctrl+s` | **Save & Next**. For delete-vs-modified conflicts, this keeps the file as reference or lets you adapt it, but it does not guarantee upstream still invokes it. |
 | `Ctrl+q` | **Quit** the application. |
+
+For upstream deletion conflicts, Chezmerge intentionally does **not** treat “keep” as “fully resolved behavior.”
+
+* Choose **Save & Next** when you want to preserve your local customization as reference material, especially if you plan to manually reconnect it later or use an LLM agent to migrate the behavior into the new upstream structure.
+* Choose **Delete To Match Upstream** when you believe the upstream deletion reflects the new desired behavior and you do not need the old customization anymore.
 
 ---
 
