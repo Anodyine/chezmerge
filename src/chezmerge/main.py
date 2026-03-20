@@ -194,6 +194,7 @@ def run():
     inner_prefix = f"{normalized_inner}/" if normalized_inner else ""
     analysis_pass = 0
     kept_deletion_paths: set[str] = set()
+    kept_binary_paths: set[str] = set()
 
     def to_inner_relative(upstream_path: str) -> Optional[str]:
         if not normalized_inner:
@@ -428,6 +429,10 @@ def run():
                 ours_content = render_chezmoi_template(raw_local_content)
 
             template_content = raw_local_content
+            is_binary = any(
+                git.is_probably_binary_content(content)
+                for content in (base_content, theirs_content, raw_local_content)
+            )
 
             base_state = FileState(base_content, rel_target_path)
             theirs_state = FileState(theirs_content, rel_target_path)
@@ -437,7 +442,12 @@ def run():
             scenario = engine.analyze(base_state, theirs_state, ours_state, template_state)
 
             merged_content = None
-            if scenario == MergeScenario.CONFLICT:
+            if scenario == MergeScenario.CONFLICT and is_binary:
+                if str(local_file) in kept_binary_paths:
+                    print(f"Keeping local binary file: {local_file}")
+                    continue
+                scenario = MergeScenario.BINARY_CONFLICT
+            elif scenario == MergeScenario.CONFLICT:
                 merge_ours_content = template_content if is_tmpl else ours_content
                 success, result = git.attempt_merge(base_content, merge_ours_content, theirs_content)
                 if success:
@@ -446,10 +456,6 @@ def run():
                 elif is_tmpl:
                     scenario = MergeScenario.TEMPLATE_DIVERGENCE
 
-            is_binary = any(
-                git.is_probably_binary_content(content)
-                for content in (base_content, theirs_content, raw_local_content)
-            )
             if is_binary:
                 if scenario in (
                     MergeScenario.ALREADY_SYNCED,
@@ -458,12 +464,7 @@ def run():
                 ):
                     pass
                 elif scenario == MergeScenario.AUTO_MERGEABLE:
-                    scenario = MergeScenario.CONFLICT
-
-                if scenario == MergeScenario.CONFLICT:
-                    print(f"Binary conflict: {rel_target_path}")
-                    unresolved_missing.append(rel_target_path)
-                    continue
+                    scenario = MergeScenario.BINARY_CONFLICT
 
             if scenario == MergeScenario.ALREADY_SYNCED:
                 continue
@@ -511,7 +512,7 @@ def run():
             return
 
         if merge_items:
-            from .ui import ChezmergeApp, DeletionConflictChoiceApp
+            from .ui import BinaryConflictChoiceApp, ChezmergeApp, DeletionConflictChoiceApp
 
             current_item = merge_items[0]
             if current_item.scenario == MergeScenario.DELETION_CONFLICT:
@@ -542,6 +543,25 @@ def run():
                         continue
                     current_item = results[0]
                     current_item.deletion_reviewed = True
+            elif current_item.scenario == MergeScenario.BINARY_CONFLICT:
+                while True:
+                    choice = BinaryConflictChoiceApp(current_item).run()
+                    if choice is None:
+                        return
+
+                    if choice == "keep":
+                        current_item.keep_local_on_save = True
+                        current_item.take_theirs_on_save = False
+                        kept_binary_paths.add(current_item.path)
+                        results = [current_item]
+                        break
+
+                    if choice == "take":
+                        current_item.keep_local_on_save = False
+                        current_item.take_theirs_on_save = True
+                        kept_binary_paths.discard(current_item.path)
+                        results = [current_item]
+                        break
             else:
                 app = ChezmergeApp([current_item], external_editor=args.editor)
                 results = app.run()
@@ -557,6 +577,17 @@ def run():
                         dest.unlink()
                     git.stage_file(item.path)
                     print(f"Deleted {item.path}")
+                    continue
+
+                if item.keep_local_on_save:
+                    print(f"Keeping local version of {item.path}")
+                    continue
+
+                if item.take_theirs_on_save:
+                    record_path_before_change(item.path)
+                    git.write_local_file(item.path, item.theirs.content)
+                    git.stage_file(item.path)
+                    print(f"Took upstream version of {item.path}")
                     continue
 
                 record_path_before_change(item.path)

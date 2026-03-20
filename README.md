@@ -165,6 +165,7 @@ When manual intervention is required, the TUI launches with a grid layout:
 | `k` | In the deleted-upstream choice screen, **Keep** the file as reference for later adaptation. |
 | `d` | In the deleted-upstream choice screen, **Delete** the file to match upstream. |
 | `l` | In the deleted-upstream choice screen, **Take A Look** before deciding. |
+| `t` | In the binary-conflict choice screen, **Take Their Version** from upstream. |
 | `Ctrl+s` | **Keep / Save** in the merge editor. |
 | `Ctrl+q` | **Quit** the application. |
 
@@ -173,6 +174,11 @@ For upstream deletion conflicts, Chezmerge intentionally does **not** treat “k
 * Choose **Keep** when you want to preserve your local customization as reference material, especially if you plan to manually reconnect it later or use an LLM agent to migrate the behavior into the new upstream structure.
 * Choose **Delete** when you believe the upstream deletion reflects the new desired behavior and you do not need the old customization anymore.
 * Choose **Take A Look** when you do not remember what changed and want to inspect or edit the file first. After you leave that review step, Chezmerge asks again whether you want to keep what you just saved or delete it.
+
+For binary conflicts, Chezmerge presents a simpler choice flow because these files cannot be merged in the text editor.
+
+* Choose **Keep My Version** when your current local binary file is the one you want to preserve.
+* Choose **Take Their Version** when you want to replace your local binary file with the upstream copy.
 
 ---
 

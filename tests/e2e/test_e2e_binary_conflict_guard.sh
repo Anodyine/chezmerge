@@ -60,14 +60,14 @@ OUTPUT=$(uv run --directory "$PROJECT_ROOT" -m chezmerge.main \
 
 echo "$OUTPUT"
 
-if ! echo "$OUTPUT" | grep -q "Binary conflict: wallpaper.jpg"; then
-  echo "FAILURE: Expected binary conflict guard message"
+if echo "$OUTPUT" | grep -q "manual resolution before advancing base pointer"; then
+  echo "FAILURE: Binary conflicts should now enter the merge flow instead of aborting immediately"
   exit 1
 fi
 
-if ! echo "$OUTPUT" | grep -q "manual resolution before advancing base pointer"; then
-  echo "FAILURE: Expected binary conflict to stop the merge flow"
+if ! echo "$OUTPUT" | grep -q "wallpaper.jpg \\[BINARY_CONFLICT\\]"; then
+  echo "FAILURE: Expected binary conflict to be surfaced as a merge item"
   exit 1
 fi
 
-echo -e "${GREEN}SUCCESS: Binary conflicts are kept out of the text merge UI.${NC}"
+echo -e "${GREEN}SUCCESS: Binary conflicts are routed into the beginner-friendly choice flow.${NC}"

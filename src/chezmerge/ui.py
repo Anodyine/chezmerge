@@ -105,6 +105,57 @@ class DeletionConflictChoiceApp(App[str | None]):
         self.exit(None)
 
 
+class BinaryConflictChoiceApp(App[str | None]):
+    CSS = DeletionConflictChoiceApp.CSS
+
+    BINDINGS = [
+        ("k", "keep_choice", "Keep Mine"),
+        ("t", "take_choice", "Take Theirs"),
+        ("escape", "cancel_choice", "Quit"),
+    ]
+
+    def __init__(self, item: MergeItem):
+        super().__init__()
+        self.item = item
+
+    def compose(self) -> ComposeResult:
+        body = (
+            "Upstream and local both changed this binary file.\n\n"
+            "Keep my version: preserve your current local file.\n"
+            "Take their version: replace your local file with the upstream copy.\n\n"
+            "Chezmerge cannot open this binary file in the text merge editor."
+        )
+
+        yield Vertical(
+            Static("Binary Conflict: Choose What To Do"),
+            Static(self.item.path, classes="hint"),
+            Static(body),
+            Horizontal(
+                Button("Keep My Version", id="keep", variant="primary"),
+                Button("Take Their Version", id="take", variant="warning"),
+                id="actions",
+            ),
+            Static("Keys: K keep mine, T take theirs, Esc quit", classes="hint"),
+            id="dialog",
+        )
+
+    def on_mount(self) -> None:
+        self.sub_title = self.item.path
+        self.query_one("#keep", Button).focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.exit(event.button.id)
+
+    def action_keep_choice(self) -> None:
+        self.exit("keep")
+
+    def action_take_choice(self) -> None:
+        self.exit("take")
+
+    def action_cancel_choice(self) -> None:
+        self.exit(None)
+
+
 class ChezmergeApp(App[list[MergeItem]]):
     CSS = """
     Grid {
