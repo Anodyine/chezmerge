@@ -195,6 +195,7 @@ def run():
     analysis_pass = 0
     kept_deletion_paths: set[str] = set()
     kept_binary_paths: set[str] = set()
+    resolved_paths: set[str] = set()
 
     def to_inner_relative(upstream_path: str) -> Optional[str]:
         if not normalized_inner:
@@ -214,6 +215,12 @@ def run():
     def record_path_before_change(path: str):
         ensure_session_started()
         session.record_path(git, path)
+
+    def cleanup_stale_session_if_pristine():
+        # If no filesystem or index changes were left behind, a lingering
+        # session would only block reruns without protecting any work.
+        if session.has_session() and not git.has_pending_changes():
+            session.cleanup()
 
     while True:
         changed_files = git.get_upstream_changes(args.inner_path)
@@ -297,6 +304,21 @@ def run():
                     continue
 
                 if not local_old:
+                    if local_new:
+                        latest_new_content = git.get_file_content("latest", new_upstream_file)
+                        raw_local_new = git.get_file_content("local", str(local_new))
+                        if raw_local_new == latest_new_content:
+                            continue
+
+                        old_display = rel_old_target or old_upstream_file
+                        new_display = rel_new_target or new_upstream_file
+                        print(
+                            f"Rename conflict: source missing but destination already exists for "
+                            f"{old_display} -> {new_display}; manual resolution required."
+                        )
+                        unresolved_missing.append(f"{old_display} -> {new_display}")
+                        continue
+
                     unresolved = rel_old_target or old_upstream_file
                     print(f"Missing local counterpart for {unresolved} (R); manual resolution required.")
                     unresolved_missing.append(unresolved)
@@ -379,6 +401,9 @@ def run():
 
                 unresolved = rel_target_path or upstream_file
                 unresolved_missing.append(unresolved)
+                continue
+
+            if change_type != "D" and str(local_file) in resolved_paths:
                 continue
 
             if change_type == "D":
@@ -473,11 +498,13 @@ def run():
                 if args.dry_run:
                     print(f"  - {str(local_file)} [{scenario.name}]")
                 else:
-                    print(f"Auto-merging {rel_target_path} ({scenario.name})...")
-                    record_path_before_change(str(local_file))
                     content_to_write = merged_content if scenario == MergeScenario.AUTO_MERGEABLE else theirs_content
                     if content_to_write is None:
                         raise RuntimeError(f"Unexpected None content for {scenario.name}")
+                    if raw_local_content == content_to_write:
+                        continue
+                    print(f"Auto-merging {rel_target_path} ({scenario.name})...")
+                    record_path_before_change(str(local_file))
                     git.write_local_file(str(local_file), content_to_write)
                     git.stage_file(str(local_file))
                 continue
@@ -519,6 +546,7 @@ def run():
                 while True:
                     choice = DeletionConflictChoiceApp(current_item).run()
                     if choice is None:
+                        cleanup_stale_session_if_pristine()
                         return
 
                     if choice == "keep":
@@ -547,6 +575,7 @@ def run():
                 while True:
                     choice = BinaryConflictChoiceApp(current_item).run()
                     if choice is None:
+                        cleanup_stale_session_if_pristine()
                         return
 
                     if choice == "keep":
@@ -566,6 +595,7 @@ def run():
                 app = ChezmergeApp([current_item], external_editor=args.editor)
                 results = app.run()
                 if not results:
+                    cleanup_stale_session_if_pristine()
                     return
 
             print("Applying changes to local files...")
@@ -593,6 +623,7 @@ def run():
                 record_path_before_change(item.path)
                 git.write_local_file(item.path, item.template.content)
                 git.stage_file(item.path)
+                resolved_paths.add(item.path)
                 print(f"Updated {item.path}")
 
             analysis_pass += 1
@@ -603,6 +634,7 @@ def run():
             for path in unresolved_missing:
                 print(f"  - {path}")
             print("Aborting without commit to avoid dropping upstream changes.")
+            cleanup_stale_session_if_pristine()
             return
 
         print("All changes merged automatically.")
